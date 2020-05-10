@@ -62,29 +62,50 @@ model.compNames=[{'Cytosol'};{'Extracellular'}];
                                                                             % directionalities available from e.g. the MetaCyc database, where reaction directionalities have 
                                                                             % been curated manually by trained scientists (see below).
 
-
+model.rev(:,1)=[1];                                                         % All reactions in the FDR are to be interpreted as reversible for now. This is done to harmonize
+                                                                            % the system prior to the introduciton of constraints pertaining to reaction directionalities 
+                                                                            % which is done later.
+                                                                            
 model=setParam(model,'lb',model.rxns,[-1000]);                              % Sets the lower bound of all reactions in the FDR to -1000 mmol gCDW^-1 h^-1.
 model=setParam(model,'ub',model.rxns,[1000]);                               % Sets the upper bound of all reactions in the FDR to 1000 mmol gCDW^-1 h^-1.
 
                                                         
                                                                             % All of the reactions in the FDR are initially assigned a confidence score of 4 to denote that
                                                                             % they were added to the model using sequence data as evidence for their existence. A confidence score
-                                                                            % of 4 further corresponds to a reaction whose reaction directionality have been manually curated.
+                                                                            % of 4 corresponds to a reaction whose reaction directionality have been manually curated.
                                                                             % Manual curation will be carried out below, and reactions whose reaction directionality couldn't
-                                                                            % be constrained will instead be assigned a lower level confidence score of 3.
-
-                                                        % EXPLAIN RULES CONFIDENCE
-                                                        % SCORES!                                                                            
+                                                                            % be constrained will instead be assigned a lower level confidence score of 3.                                                                           
                                                                             
 model.rxnConfidenceScores=(randn((numel(model.rxns)),1));model.rxnConfidenceScores(:,1)=[4];                    % Assigns a confidence score of 4 to all reactions in the FDR.
 
 FDRrcns=numel(model.rxns);                                                  % The amount of reactions currently assigned a confidence score is saved as 'FDRrcns' 
                                                                             % for later use.
                                                                             
-                                                        % ADJUST WRITTEN
-                                                        % TEXT ON CONF
-                                                        % SCORES IN THE
-                                                        % SCRIPT!
+                                                                            
+                                                                            % Every reaction is assigned a confidence score Ci?{0, 1, 2, 3, 4, 5, 6, 7} to indicate the 
+                                                                            % likelihood of its actual presence in the reactome of H. pseudoflava. The higher the 
+                                                                            % confidence score, the better the evidence motivating its incorporation. Confidence scores
+                                                                            % are assigned accordingly:
+                                                                            
+                                                                            % CRITERIA                                                                  CONFIDENCE SCORE                                                                            
+                                                                            % Biochemical data (direct evidence)                                        7
+                                                                            %   e.g. enzyme assays
+                                                                            % Genetic data                                                              6
+                                                                            %   e.g. knock-out/-in or overexpression analysis
+                                                                            % Physiological data (indirect evidence)                                    5
+                                                                            %   e.g. secretion products or defined medium requirements, 
+                                                                            %   transport-, and exchange reactions
+                                                                            % Sequence data (genome annotation)                                         4
+                                                                            %   (reaction directionality successfully curated)
+                                                                            % Sequence data (genome annotation)                                         3
+                                                                            %   (reaction directionality not curated)
+                                                                            % Modelling data – required for functional model, hypothetical reaction     2
+                                                                            %   (more likely)
+                                                                            % Modelling data – required for functional model, hypothetical reaction     1
+                                                                            %   (less likely)
+                                                                            % No evidence                                                               0
+                                                                            %   e.g. fake reactions, lumped reactions, etc.
+                                                                            
 
                                                                             % simplifyModel is run to deduce the amount of dead-end metabolites and dead-end reactions
                                                                             % in the FDR:
@@ -96,6 +117,7 @@ size(deletedMetabolites)                                                    % 11
                                                                             
 size(deletedReactions)                                                      % 799 out of 1367 reactions are dead-end reactions.                                                                         
                                                                             
+
                                                                             % An extensive literature search was carried out with the objective to identify experimentally
                                                                             % verified sole carbon sources that H. pseudoflava is confirmed to grow on. These metabolites
                                                                             % were then categorized into:
@@ -526,6 +548,7 @@ keggModel.compNames=[{'Cytosol'}];                                          % Eq
                                                                             % Acetamide to the FDR.
 
 model=addRxnsGenesMets(model,keggModel,{'R00321'},false,[],2);              % Adds the reaction R00321 (Confidence score: 2) along with the metabolite Acetamide.
+model.rev((find(ismember(model.rxns,'R00321'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R00321'))),:)=[2];                     % Reaffirms the confidence score of 2. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'Acetamide'},true,false);                % Adds a reversible transport reaction for Acetamide.
 model.rxns(end,1)={'TRP_c->e_Acetamide'};                                                   % Assigns an appropriate reaction ID to the transport reaction.
@@ -538,8 +561,10 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_Acetamide'))),:)=[5]
                                                                             % Addition of sole carbon source L-Arabinose:
                                                                             
 model=addRxnsGenesMets(model,keggModel,{'R02526'},false,[],1);              % Adds the reaction R02526 (Confidence score: 1). 
+model.rev((find(ismember(model.rxns,'R02526'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R02526'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 model=addRxnsGenesMets(model,keggModel,{'R01757'},false,[],1);              % Adds the reaction R01757 (Confidence score: 1) along with the metabolite L-Arabinose.
+model.rev((find(ismember(model.rxns,'R01757'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R01757'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'L-Arabinose'},true,false);              % Adds a reversible transport reaction for L-Arabinose.
 model.rxns(end,1)={'TRP_c->e_L-Arabinose'};                                                 % Assigns an appropriate reaction ID to the transport reaction.
@@ -552,6 +577,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_L-Arabinose'))),:)=[
                                                                             % Addition of sole carbon source Butanoic acid:
                                                                             
 model=addRxnsGenesMets(model,keggModel,{'R01176'},false,[],1);              % Adds the reaction R01176 (Confidence score: 1) along with the metabolite Butanoic acid.
+model.rev((find(ismember(model.rxns,'R01176'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R01176'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'Butanoic acid'},true,false);            % Adds a reversible transport reaction for Butanoic acid.
 model.rxns(end,1)={'TRP_c->e_Butanoic acid'};                                               % Assigns an appropriate reaction ID to the transport reaction.
@@ -564,6 +590,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_Butanoic acid'))),:)
                                                                             % Addition of sole carbon source 1-Butanol:
                                                                             
 model=addRxnsGenesMets(model,keggModel,{'R03544'},false,[],1);              % Adds the reaction R03544 (Confidence score: 1) along with the metabolite 1-Butanol.
+model.rev((find(ismember(model.rxns,'R03544'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R03544'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'1-Butanol'},true,false);                % Adds a reversible transport reaction for 1-Butanol.
 model.rxns(end,1)={'TRP_c->e_1-Butanol'};                                                   % Assigns an appropriate reaction ID to the transport reaction.
@@ -577,6 +604,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_1-Butanol'))),:)=[5]
                                                                             % Addition of sole carbon source D-Glucosamine:
                                                                             
 model=addRxnsGenesMets(model,keggModel,{'R01961'},false,[],1);              % Adds the reaction R01961 (Confidence score: 1) along with the metabolite D-Glucosamine.
+model.rev((find(ismember(model.rxns,'R01961'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R01961'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'D-Glucosamine'},true,false);            % Adds a reversible transport reaction for D-Glucosamine.
 model.rxns(end,1)={'TRP_c->e_D-Glucosamine'};                                               % Assigns an appropriate reaction ID to the transport reaction.
@@ -589,8 +617,10 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_D-Glucosamine'))),:)
                                                                             % Addition of sole carbon source 3-Hydroxybenzoate:
                                                                             
 model=addRxnsGenesMets(model,keggModel,{'R01628'},false,[],1);              % Adds the reaction R01628 (Confidence score: 1).
+model.rev((find(ismember(model.rxns,'R01628'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R01628'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 model=addRxnsGenesMets(model,keggModel,{'R02589'},false,[],1);              % Adds the reaction R02589 (Confidence score: 1) along with the metabolite 3-Hydroxybenzoate.
+model.rev((find(ismember(model.rxns,'R02589'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R02589'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'3-Hydroxybenzoate'},true,false);        % Adds a reversible transport reaction for 3-Hydroxybenzoate.
 model.rxns(end,1)={'TRP_c->e_3-Hydroxybenzoate'};                                           % Assigns an appropriate reaction ID to the transport reaction.
@@ -603,6 +633,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_3-Hydroxybenzoate'))
                                                                             % Addition of sole carbon source Lactose:
 
 model=addRxnsGenesMets(model,keggModel,{'R01100'},false,[],1);              % Adds the reaction R01100 (Confidence score: 1) along with the metabolite Lactose.
+model.rev((find(ismember(model.rxns,'R01100'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R01100'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'Lactose'},true,false);                  % Adds a reversible transport reaction for Lactose.
 model.rxns(end,1)={'TRP_c->e_Lactose'};                                                     % Assigns an appropriate reaction ID to the transport reaction.
@@ -621,6 +652,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_Lactose'))),:)=[5]; 
                                                                             % D-Lyxose to the FDR.                                                                          
                                                                             
 model=addRxnsGenesMets(model,keggModel,{'R01898'},false,[],2);              % Adds the reaction R01898 (Confidence score: 2) along with the metabolite D-Lyxose.
+model.rev((find(ismember(model.rxns,'R01898'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R01898'))),:)=[2];                     % Reaffirms the confidence score of 2. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'D-Lyxose'},true,false);                 % Adds a reversible transport reaction for D-Lyxose.
 model.rxns(end,1)={'TRP_c->e_D-Lyxose'};                                                    % Assigns an appropriate reaction ID to the transport reaction.
@@ -633,6 +665,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_D-Lyxose'))),:)=[5];
                                                                             % Addition of sole carbon source D-Mannose:
                                                                             
 model=addRxnsGenesMets(model,keggModel,{'R00877'},false,[],1);              % Adds the reaction R00877 (Confidence score: 1) along with the metabolite D-Mannose.
+model.rev((find(ismember(model.rxns,'R00877'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R00877'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'D-Mannose'},true,false);                % Adds a reversible transport reaction for D-Mannose.
 model.rxns(end,1)={'TRP_c->e_D-Mannose'};                                                   % Assigns an appropriate reaction ID to the transport reaction.
@@ -645,6 +678,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_D-Mannose'))),:)=[5]
                                                                             % Addition of sole carbon source Propane-1-ol:
 
 model=addRxnsGenesMets(model,keggModel,{'R02377'},false,[],1);              % Adds the reaction R02377 (Confidence score: 1) along with the metabolite Propane-1-ol.
+model.rev((find(ismember(model.rxns,'R02377'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R02377'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'Propane-1-ol'},true,false);             % Adds a reversible transport reaction for Propane-1-ol.
 model.rxns(end,1)={'TRP_c->e_Propane-1-ol'};                                                % Assigns an appropriate reaction ID to the transport reaction.
@@ -657,6 +691,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_Propane-1-ol'))),:)=
                                                                             % Addition of sole carbon source D-Sorbitol:
 
 model=addRxnsGenesMets(model,keggModel,{'R00875'},false,[],1);              % Adds the reaction R00875 (Confidence score: 1) along with the metabolite D-Sorbitol.
+model.rev((find(ismember(model.rxns,'R00875'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R00875'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'D-Sorbitol'},true,false);               % Adds a reversible transport reaction for D-Sorbitol.
 model.rxns(end,1)={'TRP_c->e_D-Sorbitol'};                                                  % Assigns an appropriate reaction ID to the transport reaction.
@@ -669,6 +704,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_D-Sorbitol'))),:)=[5
                                                                             % Addition of sole carbon source alpha,alpha-Trehalose:
 
 model=addRxnsGenesMets(model,keggModel,{'R00010'},false,[],1);              % Adds the reaction R00010 (Confidence score: 1) along with the metabolite alpha,alpha-Trehalose.
+model.rev((find(ismember(model.rxns,'R00010'))),1)=[1];                     % The reaction is to be interpreted as reversible for now.
 model.rxnConfidenceScores((find(ismember(model.rxns,'R00010'))),:)=[1];                     % Reaffirms the confidence score of 1. 
 [model, addedRxns]=addTransport(model,{'c'},{'e'},{'alpha,alpha-Trehalose'},true,false);    % Adds a reversible transport reaction for alpha,alpha-Trehalose.
 model.rxns(end,1)={'TRP_c->e_alpha,alpha-Trehalose'};                                       % Assigns an appropriate reaction ID to the transport reaction.
@@ -754,11 +790,16 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_OUT_Glycerol'))),:)=[2]
                                                                             % (Caspi et al., 2017) where directionalities have been curated manually by trained scientists. URLs
                                                                             % for each reaction point to specific entries in the MetaCyc database from which information on 
                                                                             % reaction directionality was taken (when available).
+                                                                            
+                                                                            % Note also that the reactants of some reactions have been swapped to products and vice versa
+                                                                            % through commands utilizing the changeRxns-function below. This is done so as to be able to
+                                                                            % properly constrain the reaction bounds.
                                                 
                                                                             % Reaction directionalities are set by manipulating the reaction bounds accordingly:                                                                                                                        
                                                                             
 model=setParam(model,'lb',{'R00005'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=ALLOPHANATE-HYDROLASE-RXN&redirect=T
-model=setParam(model,'ub',{'R00006'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ACETOLACTSYN-RXN
+model=changeRxns(model,'R00006','2 Pyruvate[c] <=> CO2[c] + 2-Acetolactate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00006'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ACETOLACTSYN-RXN
 %R00008 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=4.1.3.17-RXN&redirect=T
 model=setParam(model,'lb',{'R00013'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=GLYOCARBOLIG-RXN&redirect=T
 model=setParam(model,'lb',{'R00014'},[0]);model=setParam(model,'ub',{'R00014'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-12583&redirect=T
@@ -773,11 +814,14 @@ model=setParam(model,'lb',{'R00078'},[0]);model=setParam(model,'ub',{'R00078'},[
 model=setParam(model,'lb',{'R00081'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=CYTOCHROME-C-OXIDASE-RXN&redirect=T
 model=setParam(model,'lb',{'R00084'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=OHMETHYLBILANESYN-RXN
 model=setParam(model,'lb',{'R00089'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADENYLATECYC-RXN
-model=setParam(model,'ub',{'R00094'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUTATHIONE-REDUCT-NADPH-RXN
+model=changeRxns(model,'R00094','NADH[c] + H+[c] + Glutathione disulfide[c] <=> NAD+[c] + 2 Glutathione[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00094'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUTATHIONE-REDUCT-NADPH-RXN
 model=setParam(model,'lb',{'R00104'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=NAD-KIN-RXN
 %R00112 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PYRNUTRANSHYDROGEN-RXN
-model=setParam(model,'ub',{'R00114'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUTAMATESYN-RXN
-model=setParam(model,'ub',{'R00115'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUTATHIONE-REDUCT-NADPH-RXN
+model=changeRxns(model,'R00114','NADPH[c] + 2-Oxoglutarate[c] + L-Glutamine[c] + H+[c] <=> NADP+[c] + 2 L-Glutamate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00114'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUTAMATESYN-RXN
+model=changeRxns(model,'R00115','NADPH[c] + H+[c] + Glutathione disulfide[c] <=> NADP+[c] + 2 Glutathione[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00115'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUTATHIONE-REDUCT-NADPH-RXN
 model=setParam(model,'lb',{'R00125'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3.6.1.41-RXN
 %R00127 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADENYL-KIN-RXN
 model=setParam(model,'lb',{'R00130'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DEPHOSPHOCOAKIN-RXN
@@ -785,30 +829,35 @@ model=setParam(model,'lb',{'R00130'},[0]);                                      
 %R00132 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CARBODEHYDRAT-RXN
 model=setParam(model,'lb',{'R00137'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=2.7.7.1-RXN
 model=setParam(model,'lb',{'R00139'},[0]);model=setParam(model,'ub',{'R00139'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=NUCLEOSIDE-DIP-KIN-RXN
-model=setParam(model,'ub',{'R00143'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HYDROXYLAMINE-REDUCTASE-NADH-RXN
+model=changeRxns(model,'R00143','NADH[c] + H+[c] + Hydroxylamine[c] <=> H2O[c] + NAD+[c] + Ammonia[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00143'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HYDROXYLAMINE-REDUCTASE-NADH-RXN
 model=setParam(model,'lb',{'R00148'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=AMONITRO-RXN
 model=setParam(model,'lb',{'R00156'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=UDPKIN-RXN
 model=setParam(model,'lb',{'R00158'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-12002
 model=setParam(model,'lb',{'R00161'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=FADSYN-RXN
-model=setParam(model,'ub',{'R00177'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=S-ADENMETSYN-RXN
+model=changeRxns(model,'R00177','H2O[c] + ATP[c] + L-Methionine[c] <=> Orthophosphate[c] + Diphosphate[c] + S-Adenosyl-L-methionine[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00177'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=S-ADENMETSYN-RXN
 model=setParam(model,'lb',{'R00178'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=SAMDECARB-RXN
 model=setParam(model,'lb',{'R00182'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=AMP-NUCLEOSID-RXN
 model=setParam(model,'lb',{'R00183'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=AMP-DEPHOSPHORYLATION-RXN
 model=setParam(model,'lb',{'R00185'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADENOSINE-KINASE-RXN
 model=setParam(model,'lb',{'R00188'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=325-BISPHOSPHATE-NUCLEOTIDASE-RXN
-model=setParam(model,'ub',{'R00190'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADENPRIBOSYLTRAN-RXN
+model=changeRxns(model,'R00190','5-Phospho-alpha-D-ribose 1-diphosphate[c] + Adenine[c] <=> Diphosphate[c] + AMP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00190'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADENPRIBOSYLTRAN-RXN
 model=setParam(model,'lb',{'R00192'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADENOSYLHOMOCYSTEINASE-RXN
 model=setParam(model,'lb',{'R00194'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADENOSYLHOMOCYSTEINE-NUCLEOSIDASE-RXN
 model=setParam(model,'lb',{'R00196'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=L-LACTATE-DEHYDROGENASE-CYTOCHROME-RXN
 model=setParam(model,'lb',{'R00197'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=D-LACTATE-DEHYDROGENASE-CYTOCHROME-RXN
 %R00199 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PEPSYNTH-RXN
-model=setParam(model,'ub',{'R00200'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PEPDEPHOS-RXN
+model=changeRxns(model,'R00200','ADP[c] + Phosphoenolpyruvate[c] <=> ATP[c] + Pyruvate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00200'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PEPDEPHOS-RXN
 model=setParam(model,'lb',{'R00209'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN0-1133
 model=setParam(model,'lb',{'R00215'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.1.1.83-RXN
 model=setParam(model,'lb',{'R00216'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=MALIC-NADP-RXN
 model=setParam(model,'lb',{'R00220'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4.3.1.17-RXN
 model=setParam(model,'lb',{'R00221'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DSERDEAM-RXN
-model=setParam(model,'ub',{'R00226'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ACETOLACTSYN-RXN
+model=changeRxns(model,'R00226','2 Pyruvate[c] <=> CO2[c] + (S)-2-Acetolactate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00226'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ACETOLACTSYN-RXN
 %R00228 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ACETALD-DEHYDROG-RXN
 model=setParam(model,'lb',{'R00233'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=MALONYL-COA-DECARBOXYLASE-RXN
 model=setParam(model,'lb',{'R00235'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ACETATE--COA-LIGASE-RXN
@@ -843,9 +892,11 @@ model=setParam(model,'lb',{'R00330'},[0]);                                      
 %R00332 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GUANYL-KIN-RXN
 model=setParam(model,'lb',{'R00336'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PPGPPSYN-RXN
 %R00342 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=MALATE-DEH-RXN
-model=setParam(model,'ub',{'R00345'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PEPCARBOX-RXN
+model=changeRxns(model,'R00345','H2O[c] + CO2[c] + Phosphoenolpyruvate[c] <=> Orthophosphate[c] + Oxaloacetate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00345'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PEPCARBOX-RXN
 %R00350 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-2464
-model=setParam(model,'ub',{'R00351'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CITSYN-RXN
+model=changeRxns(model,'R00351','H2O[c] + Acetyl-CoA[c] + Oxaloacetate[c] <=> CoA[c] + Citrate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00351'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CITSYN-RXN
 model=setParam(model,'lb',{'R00357'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=L-AMINO-ACID-OXIDASE-RXN
 model=setParam(model,'lb',{'R00362'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CITLY-RXN
 %R00401 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ALARACECAT-RXN
@@ -856,14 +907,17 @@ model=setParam(model,'lb',{'R00425'},[0]);                                      
 model=setParam(model,'lb',{'R00426'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14140
                                     model=setParam(model,'lb',{'R00428'},[-1000]);model=setParam(model,'ub',{'R00428'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R00428'))),:)=[3];  % Reaction directionality unclear!                                                                     
 model=setParam(model,'lb',{'R00429'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GTPPYPHOSKIN-RXN
-model=setParam(model,'ub',{'R00430'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14117
+model=changeRxns(model,'R00430','GDP[c] + Phosphoenolpyruvate[c] <=> Pyruvate[c] + GTP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00430'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14117
 %R00431 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4.1.1.32-RXN
 model=setParam(model,'lb',{'R00434'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GUANYLCYC-RXN
 model=setParam(model,'lb',{'R00449'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=LYSINE-2-MONOOXYGENASE-RXN
 model=setParam(model,'lb',{'R00451'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DIAMINOPIMDECARB-RXN
-model=setParam(model,'ub',{'R00465'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLYOXYLATE-REDUCTASE-NADP%2b-RXN
+model=changeRxns(model,'R00465','NADPH[c] + Glyoxylate[c] + H+[c] <=> NADP+[c] + Glycolate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00465'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLYOXYLATE-REDUCTASE-NADP%2b-RXN
 %R00470 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4OH2OXOGLUTARALDOL-RXN
-model=setParam(model,'ub',{'R00472'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=MALSYN-RXN
+model=changeRxns(model,'R00472','H2O[c] + Acetyl-CoA[c] + Glyoxylate[c] <=> CoA[c] + (S)-Malate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00472'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=MALSYN-RXN
 model=setParam(model,'lb',{'R00475'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-969
 %R00479 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ISOCIT-CLEAV-RXN
 model=setParam(model,'lb',{'R00480'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ASPARTATEKIN-RXN
@@ -929,9 +983,12 @@ model=setParam(model,'lb',{'R00762'},[0]);                                      
 %R00771 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PGLUCISOM-RXN
 model=setParam(model,'lb',{'R00774'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=UREA-CARBOXYLASE-RXN
 model=setParam(model,'lb',{'R00782'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=LCYSDESULF-RXN
-model=setParam(model,'ub',{'R00783'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=NITRITE-REDUCTASE-CYTOCHROME-RXN
-model=setParam(model,'ub',{'R00785'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=NITRITE-REDUCTASE-CYTOCHROME-RXN
-model=setParam(model,'ub',{'R00787'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-13854
+model=changeRxns(model,'R00783','H+[c] + Nitrite[c] + Ferrocytochrome c[c] <=> H2O[c] + Ferricytochrome c[c] + Nitric oxide[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00783'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=NITRITE-REDUCTASE-CYTOCHROME-RXN
+model=changeRxns(model,'R00785','H+[c] + Nitrite[c] + Reduced azurin[c] <=> H2O[c] + Nitric oxide[c] + Oxidized azurin[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00785'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=NITRITE-REDUCTASE-CYTOCHROME-RXN
+model=changeRxns(model,'R00787','3 NADH[c] + 3 H+[c] + Nitrite[c] <=> 2 H2O[c] + 3 NAD+[c] + Ammonia[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00787'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-13854
                                     model=setParam(model,'lb',{'R00798'},[-1000]);model=setParam(model,'ub',{'R00798'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R00798'))),:)=[3];  % Reaction directionality unclear!
 model=setParam(model,'lb',{'R00801'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3.2.1.48-RXN
 model=setParam(model,'lb',{'R00802'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3.2.1.48-RXN
@@ -939,14 +996,18 @@ model=setParam(model,'lb',{'R00813'},[0]);                                      
 model=setParam(model,'lb',{'R00815'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PHENOL-2-MONOOXYGENASE-RXN
 model=setParam(model,'lb',{'R00816'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CATECHOL-23-DIOXYGENASE-RXN
 model=setParam(model,'lb',{'R00818'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=SALICYLATE-1-MONOOXYGENASE-RXN
-model=setParam(model,'ub',{'R00829'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-3641
+model=changeRxns(model,'R00829','CoA[c] + 3-Oxoadipyl-CoA[c] <=> Acetyl-CoA[c] + Succinyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00829'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-3641
 %R00833 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=METHYLMALONYL-COA-MUT-RXN
 model=setParam(model,'lb',{'R00835'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLU6PDEHYDROG-RXN
-model=setParam(model,'ub',{'R00842'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.1.1.8-RXN
-model=setParam(model,'ub',{'R00844'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLYC3PDEHYDROGBIOSYN-RXN
+model=changeRxns(model,'R00842','NADH[c] + H+[c] + Glycerone phosphate[c] <=> NAD+[c] + sn-Glycerol 3-phosphate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00842'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.1.1.8-RXN
+model=changeRxns(model,'R00844','NADPH[c] + H+[c] + Glycerone phosphate[c] <=> NADP+[c] + sn-Glycerol 3-phosphate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00844'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLYC3PDEHYDROGBIOSYN-RXN
 %R00847 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLYCEROL-KIN-RXN
 model=setParam(model,'lb',{'R00848'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.1.5.3&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R00858'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=SULFITE-REDUCT-RXN
+model=changeRxns(model,'R00858','3 NADPH[c] + 3 H+[c] + Sulfite[c] <=> 3 H2O[c] + 3 NADP+[c] + Hydrogen sulfide[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00858'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=SULFITE-REDUCT-RXN
 model=setParam(model,'lb',{'R00867'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=FRUCTOKINASE-RXN
 model=setParam(model,'lb',{'R00868'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=MANNITOL-2-DEHYDROGENASE-RXN
 %R00878 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUCISOM-RXN
@@ -964,10 +1025,14 @@ model=setParam(model,'lb',{'R00925'},[0]);                                      
                                     model=setParam(model,'lb',{'R00926'},[-1000]);model=setParam(model,'ub',{'R00926'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R00926'))),:)=[3];  % Reaction directionality unclear!
 %R00927 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=METHYLACETOACETYLCOATHIOL-RXN
 model=setParam(model,'lb',{'R00935'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-11213
-model=setParam(model,'ub',{'R00936'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DIHYDROFOLATEREDUCT-RXN
-model=setParam(model,'ub',{'R00937'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.5.1.3&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R00939'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.5.1.3&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R00940'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.5.1.3&quickSearch=Quick+Search
+model=changeRxns(model,'R00936','NADH[c] + H+[c] + Dihydrofolate[c] <=> NAD+[c] + Tetrahydrofolate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00936'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DIHYDROFOLATEREDUCT-RXN
+model=changeRxns(model,'R00937','2 NADH[c] + 2 H+[c] + Folate[c] <=> 2 NAD+[c] + Tetrahydrofolate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00937'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.5.1.3&quickSearch=Quick+Search
+model=changeRxns(model,'R00939','NADPH[c] + H+[c] + Dihydrofolate[c] <=> NADP+[c] + Tetrahydrofolate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00939'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.5.1.3&quickSearch=Quick+Search
+model=changeRxns(model,'R00940','2 NADPH[c] + 2 H+[c] + Folate[c] <=> 2 NADP+[c] + Tetrahydrofolate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00940'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.5.1.3&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R00942'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-6341
 model=setParam(model,'lb',{'R00944'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=FORMYLTHFDEFORMYL-RXN
 %R00945 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLYOHMETRANS-RXN
@@ -977,14 +1042,16 @@ model=setParam(model,'lb',{'R00948'},[0]);                                      
 %R00959 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PHOSPHOGLUCMUT-RXN
 model=setParam(model,'lb',{'R00963'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14025
 model=setParam(model,'lb',{'R00965'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=OROTPDECARB-RXN
-model=setParam(model,'ub',{'R00966'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=URACIL-PRIBOSYLTRANS-RXN
+model=changeRxns(model,'R00966','Uracil[c] + 5-Phospho-alpha-D-ribose 1-diphosphate[c] <=> Diphosphate[c] + UMP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.
+model=setParam(model,'lb',{'R00966'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=URACIL-PRIBOSYLTRANS-RXN
 model=setParam(model,'lb',{'R00974'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CYTDEAM-RXN
 model=setParam(model,'lb',{'R00982'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=AMINOBENZCOALIG-RXN
                                     model=setParam(model,'lb',{'R00985'},[-1000]);model=setParam(model,'ub',{'R00985'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R00985'))),:)=[3];  % Reaction directionality unclear!
 %R00986 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ANTHRANSYN-RXN
 model=setParam(model,'lb',{'R00987'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=KYNURENINASE-RXN
                                     model=setParam(model,'lb',{'R00988'},[-1000]);model=setParam(model,'ub',{'R00988'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R00988'))),:)=[3];  % Reaction directionality unclear!
-model=setParam(model,'ub',{'R00994'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.1.1.85&quickSearch=Quick+Search
+model=changeRxns(model,'R00994','NAD+[c] + D-erythro-3-Methylmalate[c] <=> NADH[c] + CO2[c] + H+[c] + 2-Oxobutanoate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R00994'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.1.1.85&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R00996'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=THREDEHYD-RXN
 %R01015 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=TRIOSEPISOMERIZATION-RXN
 model=setParam(model,'lb',{'R01016'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=METHGLYSYN-RXN
@@ -1014,10 +1081,12 @@ model=setParam(model,'lb',{'R01122'},[0]);                                      
 model=setParam(model,'lb',{'R01126'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-7607
 %R01127 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=IMPCYCLOHYDROLASE-RXN
 %R01130 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=IMP-DEHYDROG-RXN
-model=setParam(model,'ub',{'R01134'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GMP-REDUCT-RXN
+model=changeRxns(model,'R01134','NADPH[c] + H+[c] + GMP[c] <=> NADP+[c] + Ammonia[c] + IMP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01134'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GMP-REDUCT-RXN
 model=setParam(model,'lb',{'R01135'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADENYLOSUCCINATE-SYNTHASE-RXN
 model=setParam(model,'lb',{'R01137'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DADPKIN-RXN
-model=setParam(model,'ub',{'R01138'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14192
+model=changeRxns(model,'R01138','Phosphoenolpyruvate[c] + dADP[c] <=> Pyruvate[c] + dATP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01138'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14192
 model=setParam(model,'lb',{'R01150'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DALADALALIG-RXN
 model=setParam(model,'lb',{'R01157'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=AGMATIN-RXN
 model=setParam(model,'lb',{'R01158'},[0]);model=setParam(model,'ub',{'R01158'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-8001
@@ -1029,21 +1098,26 @@ model=setParam(model,'lb',{'R01185'},[0]);                                      
 model=setParam(model,'lb',{'R01186'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-10952
 model=setParam(model,'lb',{'R01187'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=MYO-INOSITOL-1OR-4-MONOPHOSPHATASE-RXN
 model=setParam(model,'lb',{'R01209'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DIHYDROXYISOVALDEHYDRAT-RXN
-model=setParam(model,'ub',{'R01213'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=2-ISOPROPYLMALATESYN-RXN
+model=changeRxns(model,'R01213','H2O[c] + Acetyl-CoA[c] + 3-Methyl-2-oxobutanoic acid[c] <=> CoA[c] + alpha-Isopropylmalate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01213'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=2-ISOPROPYLMALATESYN-RXN
 %R01214 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=BRANCHED-CHAINAMINOTRANSFERVAL-RXN
 %R01215 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=VALINE-PYRUVATE-AMINOTRANSFER-RXN
 %R01220 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=METHYLENETHFDEHYDROG-NADP-RXN
 %R01221 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GCVMULTI-RXN
-model=setParam(model,'ub',{'R01224'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.5.1.20-RXN
+model=changeRxns(model,'R01224','NADPH[c] + H+[c] + 5,10-Methylenetetrahydrofolate[c] <=> NADP+[c] + 5-Methyltetrahydrofolate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01224'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.5.1.20-RXN
 %R01226 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3-CH3-2-OXOBUTANOATE-OH-CH3-XFER-RXN
 model=setParam(model,'lb',{'R01227'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-7609
-model=setParam(model,'ub',{'R01229'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GUANPRIBOSYLTRAN-RXN
+model=changeRxns(model,'R01229','5-Phospho-alpha-D-ribose 1-diphosphate[c] + Guanine[c] <=> Diphosphate[c] + GMP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01229'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GUANPRIBOSYLTRAN-RXN
 model=setParam(model,'lb',{'R01230'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GMP-SYN-NH3-RXN
 model=setParam(model,'lb',{'R01231'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GMP-SYN-GLUT-RXN
 model=setParam(model,'lb',{'R01238'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4-HYDROXYBENZOATE-DECARBOXYLASE-RXN
 model=setParam(model,'lb',{'R01244'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADENINE-DEAMINASE-RXN
-model=setParam(model,'ub',{'R01248'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PYRROLINECARBREDUCT-RXN
-model=setParam(model,'ub',{'R01251'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PYRROLINECARBREDUCT-RXN
+model=changeRxns(model,'R01248','NADH[c] + H+[c] + (S)-1-Pyrroline-5-carboxylate[c] <=> NAD+[c] + L-Proline[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01248'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PYRROLINECARBREDUCT-RXN
+model=changeRxns(model,'R01251','NADPH[c] + H+[c] + (S)-1-Pyrroline-5-carboxylate[c] <=> NADP+[c] + L-Proline[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01251'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PYRROLINECARBREDUCT-RXN
 model=setParam(model,'lb',{'R01252'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN490-3641
 model=setParam(model,'lb',{'R01253'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14903
 model=setParam(model,'lb',{'R01262'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-6601
@@ -1061,7 +1135,8 @@ model=setParam(model,'lb',{'R01354'},[0]);                                      
 model=setParam(model,'lb',{'R01357'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ACETOACETATE--COA-LIGASE-RXN
 model=setParam(model,'lb',{'R01360'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HYDROXYMETHYLGLUTARYL-COA-LYASE-RXN
 %R01361 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3-HYDROXYBUTYRATE-DEHYDROGENASE-RXN
-model=setParam(model,'ub',{'R01364'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=FUMARYLACETOACETASE-RXN
+model=changeRxns(model,'R01364','H2O[c] + 4-Fumarylacetoacetate[c] <=> Fumarate[c] + Acetoacetate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01364'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=FUMARYLACETOACETASE-RXN
 model=setParam(model,'lb',{'R01372'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-10815
 %R01373 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PREPHENATEDEHYDRAT-RXN
 model=setParam(model,'lb',{'R01374'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-11193
@@ -1074,8 +1149,10 @@ model=setParam(model,'lb',{'R01384'},[0]);                                      
 %R01397 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ASPCARBTRANS-RXN
 %R01398 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ORNCARBAMTRANSFER-RXN
 model=setParam(model,'lb',{'R01401'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=METHYLTHIOADENOSINE-NUCLEOSIDASE-RXN
-model=setParam(model,'ub',{'R01403'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.9&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R01404'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ENOYL-ACP-REDUCT-NADPH-RXN
+model=changeRxns(model,'R01403','NADH[c] + H+[c] + trans-2,3-Dehydroacyl-[acyl-carrier protein][c] <=> NAD+[c] + Acyl-[acyl-carrier protein][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01403'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.9&quickSearch=Quick+Search
+model=changeRxns(model,'R01404','NADPH[c] + H+[c] + trans-2,3-Dehydroacyl-[acyl-carrier protein][c] <=> NADP+[c] + Acyl-[acyl-carrier protein][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01404'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ENOYL-ACP-REDUCT-NADPH-RXN
 model=setParam(model,'lb',{'R01411'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14197
 model=setParam(model,'lb',{'R01424'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HIPPURATE-HYDROLASE-RXN
 model=setParam(model,'lb',{'R01429'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=D-XYLOSE-1-DEHYDROGENASE-RXN
@@ -1089,7 +1166,8 @@ model=setParam(model,'lb',{'R01507'},[0]);                                      
 %R01518 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15513
 model=setParam(model,'lb',{'R01519'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUCONOLACT-RXN
 %R01523 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PHOSPHORIBULOKINASE-RXN
-model=setParam(model,'ub',{'R01525'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RIBITOL-5-PHOSPHATE-2-DEHYDROGENASE-RXN
+model=changeRxns(model,'R01525','NADPH[c] + H+[c] + D-Ribulose 5-phosphate[c] <=> NADP+[c] + D-Ribitol 5-phosphate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01525'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RIBITOL-5-PHOSPHATE-2-DEHYDROGENASE-RXN
 %R01529 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RIBULP3EPIM-RXN
 %R01530 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DARAB5PISOM-RXN
 model=setParam(model,'lb',{'R01547'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DEOXYADENYLATE-KINASE-RXN
@@ -1104,9 +1182,11 @@ model=setParam(model,'lb',{'R01631'},[0]);                                      
 model=setParam(model,'lb',{'R01632'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PROTOCATECHUATE-45-DIOXYGENASE-RXN
 model=setParam(model,'lb',{'R01639'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=XYLULOKIN-RXN
 %R01641 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1TRANSKETO-RXN
-model=setParam(model,'ub',{'R01644'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4-HYDROXYBUTYRATE-DEHYDROGENASE-RXN
+model=changeRxns(model,'R01644','NADH[c] + H+[c] + Succinate semialdehyde[c] <=> NAD+[c] + 4-Hydroxybutanoic acid[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01644'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4-HYDROXYBUTYRATE-DEHYDROGENASE-RXN
 model=setParam(model,'lb',{'R01645'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4-HYDROXY-2-KETOPIMELATE-LYSIS-RXN
-model=setParam(model,'ub',{'R01647'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4-HYDROXY-2-KETOPIMELATE-LYSIS-RXN
+model=changeRxns(model,'R01647','2,4-Dihydroxyhept-2-enedioate[c] <=> Pyruvate[c] + Succinate semialdehyde[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01647'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4-HYDROXY-2-KETOPIMELATE-LYSIS-RXN
 %R01648 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GABATRANSAM-RXN
 %R01655 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=METHENYLTHFCYCLOHYDRO-RXN
 model=setParam(model,'lb',{'R01658'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GPPSYN-RXN
@@ -1120,21 +1200,26 @@ model=setParam(model,'lb',{'R01711'},[0]);                                      
 model=setParam(model,'lb',{'R01714'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CHORISMATE-SYNTHASE-RXN
 %R01715 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CHORISMATEMUT-RXN
 model=setParam(model,'lb',{'R01716'},[-1000]);model=setParam(model,'ub',{'R01716'},[1000]); %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PABASYN-RXN                                         Irreversible in the original FDR.
-model=setParam(model,'ub',{'R01724'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=NICOTINATEPRIBOSYLTRANS-RXN
+model=changeRxns(model,'R01724','H2O[c] + ATP[c] + H+[c] + 5-Phospho-alpha-D-ribose 1-diphosphate[c] + Nicotinate[c] <=> ADP[c] + Orthophosphate[c] + Diphosphate[c] + Nicotinate D-ribonucleotide[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01724'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=NICOTINATEPRIBOSYLTRANS-RXN
 model=setParam(model,'lb',{'R01728'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PREPHENATEDEHYDROG-RXN
 %R01731 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PREPHENATE-ASP-TRANSAMINE-RXN
 model=setParam(model,'lb',{'R01736'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLYOXII-RXN
 model=setParam(model,'lb',{'R01737'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUCONOKIN-RXN
-model=setParam(model,'ub',{'R01739'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.1.1.215-RXN
+model=changeRxns(model,'R01739','NADPH[c] + H+[c] + 2-Keto-D-gluconic acid[c] <=> NADP+[c] + D-Gluconic acid[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01739'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.1.1.215-RXN
 %R01751 is reversible (= in MetaCyc)                                                        %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=TARTRATE-DECARBOXYLASE-RXN&redirect=T
 model=setParam(model,'lb',{'R01752'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.2.1.3&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R01768'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-7682
 model=setParam(model,'lb',{'R01771'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HOMOSERKIN-RXN
-model=setParam(model,'ub',{'R01773'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HOMOSERDEHYDROG-RXN
-model=setParam(model,'ub',{'R01775'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HOMOSERDEHYDROG-RXN
+model=changeRxns(model,'R01773','NADH[c] + H+[c] + L-Aspartate 4-semialdehyde[c] <=> NAD+[c] + L-Homoserine[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01773'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HOMOSERDEHYDROG-RXN
+model=changeRxns(model,'R01775','NADPH[c] + H+[c] + L-Aspartate 4-semialdehyde[c] <=> NADP+[c] + L-Homoserine[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01775'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HOMOSERDEHYDROG-RXN
 %R01776 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HOMOSERINE-O-ACETYLTRANSFERASE-RXN
 model=setParam(model,'lb',{'R01777'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=HOMSUCTRAN-RXN
-model=setParam(model,'ub',{'R01779'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-7698&redirect=T
+model=changeRxns(model,'R01779','NADPH[c] + H+[c] + 3-Oxoacyl-CoA[c] <=> NADP+[c] + (3R)-3-Hydroxyacyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01779'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-7698&redirect=T
 model=setParam(model,'lb',{'R01786'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUCOKIN-RXN
 model=setParam(model,'lb',{'R01795'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.14.16.1&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R01799'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CDPDIGLYSYN-RXN
@@ -1150,7 +1235,8 @@ model=setParam(model,'lb',{'R01845'},[0]);                                      
 model=setParam(model,'lb',{'R01855'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN0-385
 model=setParam(model,'lb',{'R01856'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DGTPTRIPHYDRO-RXN
 model=setParam(model,'lb',{'R01857'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DGDPKIN-RXN
-model=setParam(model,'ub',{'R01858'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14207   
+model=changeRxns(model,'R01858','Phosphoenolpyruvate[c] + dGDP[c] <=> Pyruvate[c] + dGTP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01858'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14207   
 %R01859 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PROPIONYL-COA-CARBOXY-RXN
 %R01863 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=INOPHOSPHOR-RXN
 model=setParam(model,'lb',{'R01868'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.5.2&quickSearch=Quick+Search
@@ -1168,18 +1254,25 @@ model=setParam(model,'lb',{'R01954'},[0]);                                      
 model=setParam(model,'lb',{'R01959'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ARYLFORMAMIDASE-RXN
 model=setParam(model,'lb',{'R01968'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14142
 %R01975 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-11662
-model=setParam(model,'ub',{'R01976'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3-HYDROXYBUTYRYL-COA-DEHYDROGENASE-RXN
-model=setParam(model,'ub',{'R01977'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-5901
+model=changeRxns(model,'R01976','NADPH[c] + H+[c] + Acetoacetyl-CoA[c] <=> NADP+[c] + (S)-3-Hydroxybutanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01976'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3-HYDROXYBUTYRYL-COA-DEHYDROGENASE-RXN
+model=changeRxns(model,'R01977','NADPH[c] + H+[c] + Acetoacetyl-CoA[c] <=> NADP+[c] + (R)-3-Hydroxybutanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R01977'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-5901
 %R01986 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14209&redirect=T
 model=setParam(model,'lb',{'R01990'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GUANIDINOBUTYRASE-RXN
 %R01993 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DIHYDROOROT-RXN
 model=setParam(model,'lb',{'R02003'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=FPPSYN-RXN
-model=setParam(model,'ub',{'R02016'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=THIOREDOXIN-REDUCT-NADPH-RXN
-model=setParam(model,'ub',{'R02017'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADPREDUCT-RXN
-model=setParam(model,'ub',{'R02018'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=UDPREDUCT-RXN
-model=setParam(model,'ub',{'R02019'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GDPREDUCT-RXN
+model=changeRxns(model,'R02016','NADPH[c] + H+[c] + Thioredoxin disulfide[c] <=> NADP+[c] + Thioredoxin[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02016'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=THIOREDOXIN-REDUCT-NADPH-RXN
+model=changeRxns(model,'R02017','ADP[c] + Thioredoxin[c] <=> H2O[c] + dADP[c] + Thioredoxin disulfide[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02017'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ADPREDUCT-RXN
+model=changeRxns(model,'R02018','UDP[c] + Thioredoxin[c] <=> H2O[c] + Thioredoxin disulfide[c] + dUDP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02018'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=UDPREDUCT-RXN
+model=changeRxns(model,'R02019','GDP[c] + Thioredoxin[c] <=> H2O[c] + Thioredoxin disulfide[c] + dGDP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02019'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GDPREDUCT-RXN
 %R02021 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.8.4.8-RXN
-model=setParam(model,'ub',{'R02024'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CDPREDUCT-RXN
+model=changeRxns(model,'R02024','CDP[c] + Thioredoxin[c] <=> H2O[c] + Thioredoxin disulfide[c] + dCDP[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02024'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CDPREDUCT-RXN
 model=setParam(model,'lb',{'R02026'},[0]);                                                  %https://www.genome.jp/dbget-bin/www_bget?rn:R02026
 model=setParam(model,'lb',{'R02029'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=3.1.3.27&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R02035'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=6PGLUCONOLACT-RXN
@@ -1206,13 +1299,18 @@ model=setParam(model,'lb',{'R02135'},[0]);                                      
 model=setParam(model,'lb',{'R02164'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.5.1&quickSearch=Quick+Search
 %R02199 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=BRANCHED-CHAINAMINOTRANSFERILEU-RXN
 model=setParam(model,'lb',{'R02222'},[0]);model=setParam(model,'ub',{'R02222'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.14.19.1-RXN
-model=setParam(model,'ub',{'R02235'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-18357
-model=setParam(model,'ub',{'R02236'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-18357
+model=changeRxns(model,'R02235','NADH[c] + H+[c] + Folate[c] <=> NAD+[c] + Dihydrofolate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02235'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-18357
+model=changeRxns(model,'R02236','NADPH[c] + H+[c] + Folate[c] <=> NADP+[c] + Dihydrofolate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02236'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-18357
 model=setParam(model,'lb',{'R02237'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DIHYDROFOLATESYNTH-RXN
 model=setParam(model,'lb',{'R02240'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DIACYLGLYKIN-RXN
-model=setParam(model,'ub',{'R02241'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-1623
-model=setParam(model,'ub',{'R02251'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DIACYLGLYCEROL-O-ACYLTRANSFERASE-RXN
-model=setParam(model,'ub',{'R02272'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GSAAMINOTRANS-RXN
+model=changeRxns(model,'R02241','Acyl-CoA[c] + 1-Acyl-sn-glycerol 3-phosphate[c] <=> CoA[c] + Phosphatidate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02241'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-1623
+model=changeRxns(model,'R02251','Acyl-CoA[c] + 1,2-Diacyl-sn-glycerol[c] <=> CoA[c] + Triacylglycerol[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02251'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DIACYLGLYCEROL-O-ACYLTRANSFERASE-RXN
+model=changeRxns(model,'R02272','(S)-4-Amino-5-oxopentanoate[c] <=> 5-Aminolevulinate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02272'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GSAAMINOTRANS-RXN
 model=setParam(model,'lb',{'R02273'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=5-AMINOPENTANAMIDASE-RXN
 %R02274 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=VAGL-RXN
 model=setParam(model,'lb',{'R02278'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=4.2.1.43-RXN
@@ -1225,7 +1323,8 @@ model=setParam(model,'lb',{'R02288'},[0]);                                      
 %R02296 is reversible                                                                       %https://biocyc.org/META/substring-search?type=NIL&object=2.4.2.2&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R02297'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=XANTHOSINEPHOSPHORY-RXN
 model=setParam(model,'lb',{'R02300'},[0]);model=setParam(model,'ub',{'R02300'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-6321&redirect=T
-model=setParam(model,'ub',{'R02320'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.7.1.40&quickSearch=Quick+Search
+model=changeRxns(model,'R02320','Phosphoenolpyruvate[c] + NDP[c] <=> Pyruvate[c] + Nucleoside triphosphate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02320'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.7.1.40&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R02322'},[0]);model=setParam(model,'ub',{'R02322'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=NMNAMIDOHYDRO-RXN
 model=setParam(model,'lb',{'R02323'},[0]);model=setParam(model,'ub',{'R02323'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-5841
 model=setParam(model,'lb',{'R02325'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DCTP-DEAM-RXN
@@ -1236,9 +1335,11 @@ model=setParam(model,'lb',{'R02331'},[0]);                                      
 model=setParam(model,'lb',{'R02401'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUTARATE-SEMIALDEHYDE-DEHYDROGENASE-RXN
 %R02404 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=SUCCCOASYN-RXN
 model=setParam(model,'lb',{'R02408'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=CYSTHIOCYS-RXN
-model=setParam(model,'ub',{'R02413'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=SHIKIMATE-5-DEHYDROGENASE-RXN
+model=changeRxns(model,'R02413','NADPH[c] + H+[c] + 3-Dehydroshikimate[c] <=> NADP+[c] + Shikimate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02413'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=SHIKIMATE-5-DEHYDROGENASE-RXN
 model=setParam(model,'lb',{'R02427'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-12246
-model=setParam(model,'ub',{'R02472'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2-DEHYDROPANTOATE-REDUCT-RXN&redirect=T
+model=changeRxns(model,'R02472','NADPH[c] + H+[c] + 2-Dehydropantoate[c] <=> NADP+[c] + (R)-Pantoate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02472'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2-DEHYDROPANTOATE-REDUCT-RXN&redirect=T
 model=setParam(model,'lb',{'R02473'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=PANTOATE-BETA-ALANINE-LIG-RXN&redirect=T
 %R02484 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=URA-PHOSPH-RXN&redirect=T
 model=setParam(model,'lb',{'R02487'},[0]);model=setParam(model,'ub',{'R02487'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUTARYL-COA-DEHYDROGENASE-RXN
@@ -1250,16 +1351,21 @@ model=setParam(model,'lb',{'R02522'},[0]);                                      
 model=setParam(model,'lb',{'R02539'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-10819&redirect=T
 %R02545 is reversible                                                                       %https://biocyc.org/META/substring-search?type=NIL&object=1.1.1.93&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R02549'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=AMINOBUTDEHYDROG-RXN&redirect=T
-model=setParam(model,'ub',{'R02550'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=TOLUENE-SIDE-CHAIN-MONOOXYGENASE-RXN
+model=changeRxns(model,'R02550','Oxygen[c] + 2 H+[c] + 2 Reduced ferredoxin[c] + Toluene[c] <=> H2O[c] + 2 Oxidized ferredoxin[c] + Benzyl alcohol[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02550'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=TOLUENE-SIDE-CHAIN-MONOOXYGENASE-RXN
 model=setParam(model,'lb',{'R02558'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=PRUNASIN-BETA-GLUCOSIDASE-RXN&redirect=T
 model=setParam(model,'lb',{'R02568'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8631&redirect=T
-model=setParam(model,'ub',{'R02569'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN0-1133&redirect=T
-model=setParam(model,'ub',{'R02570'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN0-1147&redirect=T
-model=setParam(model,'ub',{'R02571'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.61&quickSearch=Quick+Search
+model=changeRxns(model,'R02569','CoA[c] + [Dihydrolipoyllysine-residue acetyltransferase] S-acetyldihydrolipoyllysine[c] <=> Acetyl-CoA[c] + Enzyme N6-(dihydrolipoyl)lysine[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02569'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN0-1133&redirect=T
+model=changeRxns(model,'R02570','CoA[c] + [Dihydrolipoyllysine-residue succinyltransferase] S-succinyldihydrolipoyllysine[c] <=> Succinyl-CoA[c] + Enzyme N6-(dihydrolipoyl)lysine[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02570'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN0-1147&redirect=T
+model=changeRxns(model,'R02571','CoA[c] + [Dihydrolipoyllysine-residue succinyltransferase] S-glutaryldihydrolipoyllysine[c] <=> Glutaryl-CoA[c] + Enzyme N6-(dihydrolipoyl)lysine[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02571'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.61&quickSearch=Quick+Search
                                     model=setParam(model,'lb',{'R02596'},[-1000]);model=setParam(model,'ub',{'R02596'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R02596'))),:)=[3];  % Reaction directionality unclear!
 model=setParam(model,'lb',{'R02601'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2-OXOPENT-4-ENOATE-HYDRATASE-RXN&redirect=T
 model=setParam(model,'lb',{'R02602'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=4.1.1.77-RXN&redirect=T
-model=setParam(model,'ub',{'R02604'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=3.7.1.9-RXN&redirect=T
+model=changeRxns(model,'R02604','H2O[c] + 2-Hydroxymuconate semialdehyde[c] <=> Formate[c] + 2-Hydroxy-2,4-pentadienoate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02604'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=3.7.1.9-RXN&redirect=T
 %R02649 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=ACETYLGLUTKIN-RXN&redirect=T
 model=setParam(model,'lb',{'R02656'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=GENTISATE-12-DIOXYGENASE-RXN&redirect=T
 model=setParam(model,'lb',{'R02668'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=3-HYDROXY-KYNURENINASE-RXN&redirect=T
@@ -1275,13 +1381,16 @@ model=setParam(model,'lb',{'R02736'},[0]);                                      
 %R02740 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PGLUCISOM-RXN
 model=setParam(model,'lb',{'R02752'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=GLUCARDEHYDRA-RXN&redirect=T
 model=setParam(model,'lb',{'R02762'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8527&redirect=T
-model=setParam(model,'ub',{'R02763'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15423
+model=changeRxns(model,'R02763','3-Carboxy-2-hydroxymuconate semialdehyde[c] <=> CO2[c] + 2-Hydroxymuconate semialdehyde[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02763'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15423
 model=setParam(model,'lb',{'R02777'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=DTDPDEHYRHAMREDUCT-RXN&redirect=T
 model=setParam(model,'lb',{'R02783'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=UDP-NACMURALA-GLU-LIG-RXN&redirect=T
 model=setParam(model,'lb',{'R02788'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=UDP-NACMURALGLDAPLIG-RXN&redirect=T
-model=setParam(model,'ub',{'R02804'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-12130
+model=changeRxns(model,'R02804','2 H+[c] + 2 Ferrocytochrome c[c] + Nitrous oxide[c] <=> H2O[c] + 2 Ferricytochrome c[c] + Nitrogen[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02804'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-12130
 model=setParam(model,'lb',{'R02869'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=SPERMINE-SYNTHASE-RXN&redirect=T
-model=setParam(model,'ub',{'R02914'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=UROCANATE-HYDRATASE-RXN&redirect=T
+model=changeRxns(model,'R02914','H2O[c] + Urocanate[c] <=> 4-Imidazolone-5-propanoate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                    
+model=setParam(model,'lb',{'R02914'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=UROCANATE-HYDRATASE-RXN&redirect=T
 model=setParam(model,'lb',{'R02918'},[0]);model=setParam(model,'ub',{'R02918'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=TYROSINE--TRNA-LIGASE-RXN&redirect=T
 model=setParam(model,'lb',{'R02921'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2.7.7.40-RXN&redirect=T
 model=setParam(model,'lb',{'R02922'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=CREATININE-DEAMINASE-RXN&redirect=T
@@ -1293,7 +1402,8 @@ model=setParam(model,'lb',{'R02964'},[0]);                                      
 model=setParam(model,'lb',{'R02968'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=NAPHTHALENE-12-DIOXYGENASE-RXN&redirect=T
 model=setParam(model,'lb',{'R02971'},[0]);model=setParam(model,'ub',{'R02971'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=PANTETHEINE-KINASE-RXN&redirect=T
                                     model=setParam(model,'lb',{'R02984'},[-1000]);model=setParam(model,'ub',{'R02984'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R02984'))),:)=[3];  % Reaction directionality unclear!
-model=setParam(model,'ub',{'R02985'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=AMYGDALIN-BETA-GLUCOSIDASE-RXN&redirect=T
+model=changeRxns(model,'R02985','H2O[c] + Amygdalin[c] <=> D-Glucose[c] + Prunasin[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R02985'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=AMYGDALIN-BETA-GLUCOSIDASE-RXN&redirect=T
 model=setParam(model,'lb',{'R02986'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2-FUROATE--COA-LIGASE-RXN&redirect=T
 model=setParam(model,'lb',{'R02987'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2-FUROYL-COA-DEHYDROGENASE-RXN&redirect=T
 model=setParam(model,'lb',{'R02990'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=3-OXOADIPATE-COA-TRANSFERASE-RXN&redirect=T
@@ -1316,8 +1426,10 @@ model=setParam(model,'lb',{'R03105'},[0]);                                      
 model=setParam(model,'lb',{'R03140'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-961&redirect=T
 model=setParam(model,'lb',{'R03165'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=UROGENIIISYN-RXN&redirect=T
 model=setParam(model,'lb',{'R03182'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=DETHIOBIOTIN-SYN-RXN&redirect=T
-model=setParam(model,'ub',{'R03191'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.98&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R03192'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.98&quickSearch=Quick+Search
+model=changeRxns(model,'R03191','NADH[c] + H+[c] + UDP-N-acetyl-3-(1-carboxyvinyl)-D-glucosamine[c] <=> NAD+[c] + UDP-N-acetylmuramate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03191'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.98&quickSearch=Quick+Search
+model=changeRxns(model,'R03192','NADPH[c] + H+[c] + UDP-N-acetyl-3-(1-carboxyvinyl)-D-glucosamine[c] <=> NADP+[c] + UDP-N-acetylmuramate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03192'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.98&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R03193'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=UDP-NACMUR-ALA-LIG-RXN&redirect=T
 model=setParam(model,'lb',{'R03194'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-13403
 model=setParam(model,'lb',{'R03197'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=UROGENDECARBOX-RXN&redirect=T
@@ -1330,33 +1442,58 @@ model=setParam(model,'lb',{'R03237'},[0]);                                      
 model=setParam(model,'lb',{'R03238'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=TAGAKIN-RXN&redirect=T
 model=setParam(model,'lb',{'R03239'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=TAGAKIN-RXN&redirect=T
 %R03243 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=HISTAMINOTRANS-RXN&redirect=T
-model=setParam(model,'ub',{'R03254'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=KDO-8PSYNTH-RXN&redirect=T
+model=changeRxns(model,'R03254','H2O[c] + Phosphoenolpyruvate[c] + D-Arabinose 5-phosphate[c] <=> Orthophosphate[c] + 3-Deoxy-D-manno-octulosonate 8-phosphate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03254'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=KDO-8PSYNTH-RXN&redirect=T
 model=setParam(model,'lb',{'R03269'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=P-PANTOCYSDECARB-RXN&redirect=T
 model=setParam(model,'lb',{'R03270'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-12508&redirect=T
 %R03276 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=5.1.2.3-RXN&redirect=T
 model=setParam(model,'lb',{'R03283'},[0]);model=setParam(model,'ub',{'R03283'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.2.1.47-RXN&redirect=T
-model=setParam(model,'ub',{'R03291'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN66-546
-model=setParam(model,'ub',{'R03293'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN66-546
+model=changeRxns(model,'R03291','NADH[c] + H+[c] + L-1-Pyrroline-3-hydroxy-5-carboxylate[c] <=> NAD+[c] + Hydroxyproline[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03291'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN66-546
+model=changeRxns(model,'R03293','NADPH[c] + H+[c] + L-1-Pyrroline-3-hydroxy-5-carboxylate[c] <=> NADP+[c] + Hydroxyproline[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03293'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN66-546
 model=setParam(model,'lb',{'R03303'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.13.11.15-RXN&redirect=T
-model=setParam(model,'ub',{'R03313'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=GLUTSEMIALDEHYDROG-RXN&redirect=T
+model=changeRxns(model,'R03313','NADPH[c] + H+[c] + L-Glutamyl 5-phosphate[c] <=> NADP+[c] + Orthophosphate[c] + L-Glutamate 5-semialdehyde[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03313'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=GLUTSEMIALDEHYDROG-RXN&redirect=T
                                     model=setParam(model,'lb',{'R03316'},[-1000]);model=setParam(model,'ub',{'R03316'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R03316'))),:)=[3];  % Reaction directionality unclear!
 %R03321 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PGLUCISOM-RXN
 model=setParam(model,'lb',{'R03346'},[0]);model=setParam(model,'ub',{'R03346'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14227&redirect=T
-model=setParam(model,'ub',{'R03348'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=QUINOPRIBOTRANS-RXN&redirect=T
+model=changeRxns(model,'R03348','5-Phospho-alpha-D-ribose 1-diphosphate[c] + Quinolinate[c] <=> CO2[c] + Diphosphate[c] + Nicotinate D-ribonucleotide[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03348'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=QUINOPRIBOTRANS-RXN&redirect=T
 model=setParam(model,'lb',{'R03350'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=KDO-8PPHOSPHAT-RXN&redirect=T
 model=setParam(model,'lb',{'R03351'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=CPM-KDOSYNTH-RXN&redirect=T
 model=setParam(model,'lb',{'R03367'},[0]);model=setParam(model,'ub',{'R03367'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-21078
 model=setParam(model,'lb',{'R03383'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-12359
 model=setParam(model,'lb',{'R03387'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=DEHYDDEOXGALACTKIN-RXN&redirect=T 
-model=setParam(model,'ub',{'R03391'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.17.1.1-RXN
-model=setParam(model,'ub',{'R03392'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.17.1.1-RXN&redirect=T
+model=changeRxns(model,'R03391','NADH[c] + H+[c] + CDP-4-dehydro-6-deoxy-D-glucose[c] <=> H2O[c] + NAD+[c] + CDP-4-dehydro-3,6-dideoxy-D-glucose[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03391'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=1.17.1.1-RXN
+model=changeRxns(model,'R03392','NADPH[c] + H+[c] + CDP-4-dehydro-6-deoxy-D-glucose[c] <=> H2O[c] + NADP+[c] + CDP-4-dehydro-3,6-dideoxy-D-glucose[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03392'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.17.1.1-RXN&redirect=T
 model=setParam(model,'lb',{'R03396'},[0]);model=setParam(model,'ub',{'R03396'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GDP-6-DEOXY-D-TALOSE-4-DEHYDROGENASE-RXN
 model=setParam(model,'lb',{'R03398'},[0]);model=setParam(model,'ub',{'R03398'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GDP-6-DEOXY-D-TALOSE-4-DEHYDROGENASE-RXN
 model=setParam(model,'lb',{'R03409'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=PPPGPPHYDRO-RXN&redirect=T
 %R03425 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=GCVP-RXN&redirect=T
 %R03443 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=N-ACETYLGLUTPREDUCT-RXN&redirect=T
 model=setParam(model,'lb',{'R03457'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=IMIDPHOSDEHYD-RXN&redirect=T
-model=setParam(model,'ub',{'R03458'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RIBOFLAVINSYNREDUC-RXN&redirect=T
+%model=changeRxns(model,'R03458','NADPH[c] + H+[c] + 5-Amino-6-(5'-phosphoribosylamino)uracil[c] <=> NADP+[c] + 5-Amino-6-(5'-phospho-D-ribitylamino)uracil[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+
+                                                                           % The changeRxns-command above did not work, therefore reactants are turned into products and
+                                                                           % vice versa in the following way:
+%constructEquations(model,(ismember(model.rxns,'R03458')))
+Irxn=ismember(model.rxns,'R03458');                                         
+Imet=ismember(model.mets,'C00005');        % NADPH[c]                                
+model.S(Imet,Irxn)=[-1];                                                   % The coefficient for NADPH[c] is changed from 1 to -1.
+Imet=ismember(model.mets,'C00080');        % H+[c]
+model.S(Imet,Irxn)=[-1];                                                   % The coefficient for H+[c] is changed from 1 to -1.
+Imet=ismember(model.mets,'C01268');        % 5-Amino-6-(5'-phosphoribosylamino)uracil[c]
+model.S(Imet,Irxn)=[-1];                                                   % The coefficient for 5-Amino-6-(5'-phosphoribosylamino)uracil[c] is changed from 1 to -1.
+Imet=ismember(model.mets,'C00006');        % NADP+[c]
+model.S(Imet,Irxn)=[1];                                                    % The coefficient for NADP+[c] is changed from -1 to 1.
+Imet=ismember(model.mets,'C04454');        % 5-Amino-6-(5'-phospho-D-ribitylamino)uracil[c]
+model.S(Imet,Irxn)=[1];                                                    % The coefficient for 5-Amino-6-(5'-phospho-D-ribitylamino)uracil[c] is changed from -1 to 1.
+%constructEquations(model,(ismember(model.rxns,'R03458')))
+
+model=setParam(model,'lb',{'R03458'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RIBOFLAVINSYNREDUC-RXN&redirect=T
 model=setParam(model,'lb',{'R03459'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RIBOFLAVINSYNDEAM-RXN&redirect=T
 %R03460 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2.5.1.19-RXN&redirect=T
 model=setParam(model,'lb',{'R03470'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=4-CARBOXYMUCONOLACTONE-DECARBOXYLASE-RXN&redirect=T
@@ -1399,20 +1536,24 @@ model=setParam(model,'lb',{'R03663'},[0]);model=setParam(model,'ub',{'R03663'},[
 model=setParam(model,'lb',{'R03664'},[0]);model=setParam(model,'ub',{'R03664'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=TRYPTOPHAN--TRNA-LIGASE-RXN&redirect=T
 model=setParam(model,'lb',{'R03665'},[0]);model=setParam(model,'ub',{'R03665'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=VALINE--TRNA-LIGASE-RXN&redirect=T
 model=setParam(model,'lb',{'R03751'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=6-HEXANOLIDE-HYDROLYSIS-RXN&redirect=T
-model=setParam(model,'ub',{'R03778'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-13617&redirect=T
+model=changeRxns(model,'R03778','CoA[c] + 3-Oxodecanoyl-CoA[c] <=> Acetyl-CoA[c] + Octanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03778'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-13617&redirect=T
 model=setParam(model,'lb',{'R03789'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=QUEUOSINE-TRNA-RIBOSYLTRANSFERASE-RXN&redirect=T
-model=setParam(model,'ub',{'R03791'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=TAGAKIN-RXN&redirect=T
+model=changeRxns(model,'R03791','(R)-Mandelate[c] <=> (S)-Mandelate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03791'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=TAGAKIN-RXN&redirect=T
 model=setParam(model,'lb',{'R03813'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=LEUCYLTRANSFERASE-RXN&redirect=T
 model=setParam(model,'lb',{'R03815'},[-1000]);model=setParam(model,'ub',{'R03815'},[1000]); %https://biocyc.org/META/substring-search?type=NIL&object=1.8.1.4&quickSearch=Quick+Search                              Irreversible in the original FDR.
 model=setParam(model,'lb',{'R03816'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-19671           
-model=setParam(model,'ub',{'R03858'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14268&redirect=T
+model=changeRxns(model,'R03858','CoA[c] + 3-Oxotetradecanoyl-CoA[c] <=> Acetyl-CoA[c] + Lauroyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03858'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14268&redirect=T
 model=setParam(model,'lb',{'R03867'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN66-336
                                     model=setParam(model,'lb',{'R03869'},[-1000]);model=setParam(model,'ub',{'R03869'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R03869'))),:)=[3];  % Reaction directionality unclear!
 model=setParam(model,'lb',{'R03889'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.2.1.32-RXN&redirect=T
 model=setParam(model,'lb',{'R03893'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=CARBOXYMETHYLENEBUTENOLIDASE-RXN&redirect=T
 %R03896 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=R-2-METHYLMALATE-DEHYDRATASE-RXN&redirect=T
 model=setParam(model,'lb',{'R03898'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-7744&redirect=T
-model=setParam(model,'ub',{'R03905'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=6.3.5.7-RXN&redirect=T
+model=changeRxns(model,'R03905','H2O[c] + ATP[c] + L-Glutamine[c] + L-Glutamyl-tRNA(Gln)[c] <=> ADP[c] + Orthophosphate[c] + L-Glutamate[c] + Glutaminyl-tRNA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                        
+model=setParam(model,'lb',{'R03905'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=6.3.5.7-RXN&redirect=T
                                     model=setParam(model,'lb',{'R03916'},[-1000]);model=setParam(model,'ub',{'R03916'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R03916'))),:)=[3];  % Reaction directionality unclear!
                                     model=setParam(model,'lb',{'R03919'},[-1000]);model=setParam(model,'ub',{'R03919'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R03919'))),:)=[3];  % Reaction directionality unclear!                                    
 model=setParam(model,'lb',{'R03920'},[0]);model=setParam(model,'ub',{'R03920'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GLUCOKIN-RXN
@@ -1423,7 +1564,8 @@ model=setParam(model,'lb',{'R03948'},[0]);                                      
 %R03968 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=3-ISOPROPYLMALISOM-RXN&redirect=T
                                     model=setParam(model,'lb',{'R03970'},[-1000]);model=setParam(model,'ub',{'R03970'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R03970'))),:)=[3];  % Reaction directionality unclear!
                                     model=setParam(model,'lb',{'R03971'},[-1000]);model=setParam(model,'ub',{'R03971'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R03971'))),:)=[3];  % Reaction directionality unclear!                                    
-model=setParam(model,'ub',{'R03991'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2.3.1.155-RXN&redirect=T
+model=changeRxns(model,'R03991','CoA[c] + 3-Oxopalmitoyl-CoA[c] <=> Acetyl-CoA[c] + Tetradecanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                            
+model=setParam(model,'lb',{'R03991'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2.3.1.155-RXN&redirect=T
 model=setParam(model,'lb',{'R03998'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.14.13.40&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R03999'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.14.13.40&quickSearch=Quick+Search
 %R04001 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-8991
@@ -1437,22 +1579,29 @@ model=setParam(model,'lb',{'R04109'},[0]);                                      
 model=setParam(model,'lb',{'R04112'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14267&redirect=T
 %R04125 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=GCVT-RXN
                                     model=setParam(model,'lb',{'R04132'},[-1000]);model=setParam(model,'ub',{'R04132'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04132'))),:)=[3];  % Reaction directionality unclear!
-model=setParam(model,'ub',{'R04134'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN1K-87&redirect=T
-model=setParam(model,'ub',{'R04137'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14266&redirect=T
+model=changeRxns(model,'R04134','2-Hydroxyhepta-2,4-dienedioate[c] <=> 2-Oxohept-3-enedioate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04134'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN1K-87&redirect=T
+model=changeRxns(model,'R04137','H2O[c] + 3-Methylcrotonyl-CoA[c] <=> 3-Hydroxyisovaleryl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04137'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14266&redirect=T
 model=setParam(model,'lb',{'R04138'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=METHYLCROTONYL-COA-CARBOXYLASE-RXN&redirect=T
 model=setParam(model,'lb',{'R04144'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=GLYRIBONUCSYN-RXN&redirect=T
 model=setParam(model,'lb',{'R04148'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=DMBPPRIBOSYLTRANS-RXN&redirect=T
-model=setParam(model,'ub',{'R04161'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=HYDROXY-MANDELATE-RACEMASE-RXN&redirect=T
-model=setParam(model,'ub',{'R04170'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-17797
+model=changeRxns(model,'R04161','(R)-4-Hydroxymandelate[c] <=> (S)-4-Hydroxymandelate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04161'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=HYDROXY-MANDELATE-RACEMASE-RXN&redirect=T
+model=changeRxns(model,'R04170','H2O[c] + 2-trans-Dodecenoyl-CoA[c] <=> (S)-3-Hydroxydodecanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04170'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-17797
 %R04173 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=PSERTRANSAM-RXN&redirect=T
 %R04187 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14265&redirect=T
 %R04188 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2.6.1.22-RXN&redirect=T
-model=setParam(model,'ub',{'R04198'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14014&redirect=T
-model=setParam(model,'ub',{'R04199'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14014&redirect=T
+model=changeRxns(model,'R04198','NADH[c] + H+[c] + (2S,4S)-4-Hydroxy-2,3,4,5-tetrahydrodipicolinate[c] <=> H2O[c] + NAD+[c] + 2,3,4,5-Tetrahydrodipicolinate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04198'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14014&redirect=T
+model=changeRxns(model,'R04199','NADPH[c] + H+[c] + (2S,4S)-4-Hydroxy-2,3,4,5-tetrahydrodipicolinate[c] <=> H2O[c] + NADP+[c] + 2,3,4,5-Tetrahydrodipicolinate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04199'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14014&redirect=T
 %R04203 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.1.1.178-RXN&redirect=T
 %R04204 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=TIGLYLCOA-HYDROXY-RXN&redirect=T
 model=setParam(model,'lb',{'R04208'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=AIRS-RXN&redirect=T
-model=setParam(model,'ub',{'R04212'},[0]);model=setParam(model,'lb',{'R04212'},[-1000]);    %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=6.3.5.6-RXN&redirect=T
+model=changeRxns(model,'R04212','H2O[c] + ATP[c] + L-Glutamine[c] + L-Aspartyl-tRNA(Asn)[c] <=> ADP[c] + Orthophosphate[c] + L-Glutamate[c] + L-Asparaginyl-tRNA(Asn)[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04212'},[0]);model=setParam(model,'ub',{'R04212'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=6.3.5.6-RXN&redirect=T
 model=setParam(model,'lb',{'R04218'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXNARA-8002
 %R04224 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=METHYLACYLYLCOA-HYDROXY-RXN&redirect=T
 model=setParam(model,'lb',{'R04231'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=P-PANTOCYSLIG-RXN&redirect=T
@@ -1460,12 +1609,29 @@ model=setParam(model,'lb',{'R04277'},[0]);                                      
 model=setParam(model,'lb',{'R04278'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.2.1.45-RXN&redirect=T
 model=setParam(model,'lb',{'R04279'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.2.1.45-RXN&redirect=T
 model=setParam(model,'lb',{'R04280'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=METHYLGALLATE-RXN&redirect=T
-model=setParam(model,'ub',{'R04292'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=QUINOLINATE-SYNTHA-RXN&redirect=T
+model=changeRxns(model,'R04292','Glycerone phosphate[c] + Iminoaspartate[c] <=> 2 H2O[c] + Orthophosphate[c] + Quinolinate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04292'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=QUINOLINATE-SYNTHA-RXN&redirect=T
 %R04325 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=GART-RXN&redirect=T
                                     model=setParam(model,'lb',{'R04326'},[-1000]);model=setParam(model,'ub',{'R04326'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04326'))),:)=[3];  % Reaction directionality unclear!
                                     model=setParam(model,'lb',{'R04355'},[-1000]);model=setParam(model,'ub',{'R04355'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04355'))),:)=[3];  % Reaction directionality unclear!
 model=setParam(model,'lb',{'R04365'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=TETHYDPICSUCC-RXN&redirect=T
-model=setParam(model,'ub',{'R04378'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14270&redirect=T
+%model=changeRxns(model,'R04378','5-Phospho-alpha-D-ribose 1-diphosphate[c] + 5-Amino-4-imidazolecarboxyamide[c] <=> Diphosphate[c] + 1-(5'-Phosphoribosyl)-5-amino-4-imidazolecarboxamide[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+
+                                                                           % The changeRxns-command above did not work, therefore reactants are turned into products and
+                                                                           % vice versa in the following way:
+%constructEquations(model,(ismember(model.rxns,'R04378')))
+Irxn=ismember(model.rxns,'R04378');                                         
+Imet=ismember(model.mets,'C00119');        % 5-Phospho-alpha-D-ribose 1-diphosphate[c]                               
+model.S(Imet,Irxn)=[-1];                                                   % The coefficient for NADPH[c] is changed from 1 to -1.
+Imet=ismember(model.mets,'C04051');        % 5-Amino-4-imidazolecarboxyamide[c]
+model.S(Imet,Irxn)=[-1];                                                   % The coefficient for H+[c] is changed from 1 to -1.
+Imet=ismember(model.mets,'C00013');        % Diphosphate[c]
+model.S(Imet,Irxn)=[1];                                                   % The coefficient for Diphosphate[c] is changed from -1 to 1.
+Imet=ismember(model.mets,'C04677');        % 1-(5'-Phosphoribosyl)-5-amino-4-imidazolecarboxamide[c]
+model.S(Imet,Irxn)=[1];                                                    % The coefficient for 1-(5'-Phosphoribosyl)-5-amino-4-imidazolecarboxamide[c] is changed from -1 to 1.
+%constructEquations(model,(ismember(model.rxns,'R04378')))
+
+model=setParam(model,'lb',{'R04378'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14270&redirect=T
 model=setParam(model,'lb',{'R04379'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=5.3.3.10-RXN&redirect=T
 model=setParam(model,'lb',{'R04380'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=4.1.1.68&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R04385'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=BIOTIN-CARBOXYL-RXN&redirect=T
@@ -1480,13 +1646,15 @@ model=setParam(model,'lb',{'R04428'},[0]);                                      
                                     model=setParam(model,'lb',{'R04429'},[-1000]);model=setParam(model,'ub',{'R04429'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04429'))),:)=[3];  % Reaction directionality unclear!
                                     model=setParam(model,'lb',{'R04430'},[-1000]);model=setParam(model,'ub',{'R04430'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04430'))),:)=[3];  % Reaction directionality unclear!                                    
 model=setParam(model,'lb',{'R04439'},[0]);model=setParam(model,'ub',{'R04439'},[1000]);     %https://biocyc.org/META/substring-search?type=NIL&object=R04439&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R04440'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.1.1.86&quickSearch=Quick+Search
+model=changeRxns(model,'R04440','NADPH[c] + H+[c] + 3-Hydroxy-3-methyl-2-oxobutanoic acid[c] <=> NADP+[c] + (R)-2,3-Dihydroxy-3-methylbutanoate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04440'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.1.1.86&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R04441'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=DIHYDROXYISOVALDEHYDRAT-RXN&redirect=T
                                     model=setParam(model,'lb',{'R04444'},[-1000]);model=setParam(model,'ub',{'R04444'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04444'))),:)=[3];  % Reaction directionality unclear! 
                                     model=setParam(model,'lb',{'R04445'},[-1000]);model=setParam(model,'ub',{'R04445'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04445'))),:)=[3];  % Reaction directionality unclear!                                     
 model=setParam(model,'lb',{'R04457'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=LUMAZINESYN-RXN
 model=setParam(model,'lb',{'R04463'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=FGAMSYN-RXN&redirect=T
-model=setParam(model,'ub',{'R04475'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=SUCCINYLDIAMINOPIMTRANS-RXN&redirect=T
+model=changeRxns(model,'R04475','L-Glutamate[c] + N-Succinyl-2-L-amino-6-oxoheptanedioate[c] <=> 2-Oxoglutarate[c] + N-Succinyl-LL-2,6-diaminoheptanedioate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04475'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=SUCCINYLDIAMINOPIMTRANS-RXN&redirect=T
 %R04478 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-2463&redirect=T
                                     model=setParam(model,'lb',{'R04482'},[-1000]);model=setParam(model,'ub',{'R04482'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04482'))),:)=[3];  % Reaction directionality unclear!
                                     model=setParam(model,'lb',{'R04506'},[-1000]);model=setParam(model,'ub',{'R04506'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04506'))),:)=[3];  % Reaction directionality unclear!                                    
@@ -1520,30 +1688,40 @@ model=setParam(model,'lb',{'R04666'},[0]);                                      
                                     model=setParam(model,'lb',{'R04672'},[-1000]);model=setParam(model,'ub',{'R04672'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04672'))),:)=[3];  % Reaction directionality unclear! 
                                     model=setParam(model,'lb',{'R04673'},[-1000]);model=setParam(model,'ub',{'R04673'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04673'))),:)=[3];  % Reaction directionality unclear!                                     
 model=setParam(model,'lb',{'R04710'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=TDCEACT-RXN
-model=setParam(model,'ub',{'R04724'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.9&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R04725'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.10&quickSearch=Quick+Search
+model=changeRxns(model,'R04724','NADH[c] + H+[c] + trans-Dodec-2-enoyl-[acp][c] <=> NAD+[c] + Dodecanoyl-[acyl-carrier protein][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04724'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.9&quickSearch=Quick+Search
+model=changeRxns(model,'R04725','NADPH[c] + H+[c] + trans-Dodec-2-enoyl-[acp][c] <=> NADP+[c] + Dodecanoyl-[acyl-carrier protein][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04725'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.10&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R04726'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9535
 model=setParam(model,'lb',{'R04734'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14206
 %R04737 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14271&redirect=T
-model=setParam(model,'ub',{'R04738'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14272&redirect=T
+model=changeRxns(model,'R04738','H2O[c] + trans-Hexadec-2-enoyl-CoA[c] <=> (S)-3-Hydroxyhexadecanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04738'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14272&redirect=T
 model=setParam(model,'lb',{'R04739'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-12507&redirect=T
-model=setParam(model,'ub',{'R04740'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14273&redirect=T
+model=changeRxns(model,'R04740','H2O[c] + trans-Tetradec-2-enoyl-CoA[c] <=> (S)-3-Hydroxytetradecanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                
+model=setParam(model,'lb',{'R04740'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14273&redirect=T
                                     model=setParam(model,'lb',{'R04741'},[-1000]);model=setParam(model,'ub',{'R04741'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04741'))),:)=[3];  % Reaction directionality unclear!
-model=setParam(model,'ub',{'R04742'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14274&redirect=T
+model=changeRxns(model,'R04742','CoA[c] + 3-Oxododecanoyl-CoA[c] <=> Acetyl-CoA[c] + Decanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                   
+model=setParam(model,'lb',{'R04742'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14274&redirect=T
 model=setParam(model,'lb',{'R04743'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-12490&redirect=T
-model=setParam(model,'ub',{'R04744'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-13616&redirect=T
+model=changeRxns(model,'R04744','H2O[c] + trans-Dec-2-enoyl-CoA[c] <=> (S)-Hydroxydecanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                   
+model=setParam(model,'lb',{'R04744'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-13616&redirect=T
 model=setParam(model,'lb',{'R04745'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14275&redirect=T
-model=setParam(model,'ub',{'R04746'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-20678
-model=setParam(model,'ub',{'R04747'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14277&redirect=T
+model=changeRxns(model,'R04746','H2O[c] + trans-Oct-2-enoyl-CoA[c] <=> (S)-3-Hydroxyoctanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                   
+model=setParam(model,'lb',{'R04746'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-20678
+model=changeRxns(model,'R04747','CoA[c] + 3-Oxooctanoyl-CoA[c] <=> Acetyl-CoA[c] + Hexanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                   
+model=setParam(model,'lb',{'R04747'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-14277&redirect=T
 %R04748 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-12570&redirect=T
-model=setParam(model,'ub',{'R04749'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-12567&redirect=T
+model=changeRxns(model,'R04749','H2O[c] + trans-Hex-2-enoyl-CoA[c] <=> (S)-Hydroxyhexanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                   
+model=setParam(model,'lb',{'R04749'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-12567&redirect=T
 model=setParam(model,'lb',{'R04771'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=S-ADENMETSYN-RXN
 model=setParam(model,'lb',{'R04773'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=6.1.1.10&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R04779'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=6PFRUCTPHOS-RXN
 model=setParam(model,'lb',{'R04780'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=F16BDEPHOS-RXN
 model=setParam(model,'lb',{'R04858'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=DNA-CYTOSINE-5--METHYLTRANSFERASE-RXN
                                     model=setParam(model,'lb',{'R04859'},[-1000]);model=setParam(model,'ub',{'R04859'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04859'))),:)=[3];  % Reaction directionality unclear!
-model=setParam(model,'ub',{'R04880'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-10911&redirect=T
+model=changeRxns(model,'R04880','NADH[c] + H+[c] + 3,4-Dihydroxymandelaldehyde[c] <=> NAD+[c] + 3,4-Dihydroxyphenylethyleneglycol[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04880'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-10911&redirect=T
 model=setParam(model,'lb',{'R04903'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-10780&redirect=T
 model=setParam(model,'lb',{'R04911'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-17150
 model=setParam(model,'lb',{'R04929'},[0]);model=setParam(model,'ub',{'R04929'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-12720
@@ -1553,24 +1731,36 @@ model=setParam(model,'lb',{'R04941'},[0]);                                      
 model=setParam(model,'lb',{'R04949'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=3.2.1.21&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R04951'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=3.4.13.-&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R04952'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.41&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R04953'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9518
+model=changeRxns(model,'R04953','NADPH[c] + H+[c] + 3-Oxohexanoyl-[acp][c] <=> NADP+[c] + (R)-3-Hydroxyhexanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04953'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9518
 model=setParam(model,'lb',{'R04954'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN66-620
-model=setParam(model,'ub',{'R04955'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9658
-model=setParam(model,'ub',{'R04956'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9521
+model=changeRxns(model,'R04955','NADH[c] + H+[c] + trans-Hex-2-enoyl-[acp][c] <=> NAD+[c] + Hexanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04955'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9658
+model=changeRxns(model,'R04956','NADPH[c] + H+[c] + trans-Hex-2-enoyl-[acp][c] <=> NADP+[c] + Hexanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04956'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9521
 model=setParam(model,'lb',{'R04957'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9523
-model=setParam(model,'ub',{'R04958'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9659
-model=setParam(model,'ub',{'R04959'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9526
+model=changeRxns(model,'R04958','NADH[c] + H+[c] + trans-Oct-2-enoyl-[acp][c] <=> NAD+[c] + Octanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04958'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9659
+model=changeRxns(model,'R04959','NADPH[c] + H+[c] + trans-Oct-2-enoyl-[acp][c] <=> NADP+[c] + Octanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04959'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9526
 model=setParam(model,'lb',{'R04960'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9527
-model=setParam(model,'ub',{'R04961'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9660
-model=setParam(model,'ub',{'R04962'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9530
+model=changeRxns(model,'R04961','NADH[c] + H+[c] + trans-Dec-2-enoyl-[acp][c] <=> NAD+[c] + Decanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04961'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9660
+model=changeRxns(model,'R04962','NADPH[c] + H+[c] + trans-Dec-2-enoyl-[acp][c] <=> NADP+[c] + Decanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04962'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9530
 model=setParam(model,'lb',{'R04963'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9531
-model=setParam(model,'ub',{'R04964'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9532
+model=changeRxns(model,'R04964','NADPH[c] + H+[c] + 3-Oxododecanoyl-[acp][c] <=> NADP+[c] + (R)-3-Hydroxydodecanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04964'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9532
 model=setParam(model,'lb',{'R04965'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN66-632
-model=setParam(model,'ub',{'R04966'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9662
-model=setParam(model,'ub',{'R04967'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ENOYL-ACP-REDUCT-NADPH-RXN
+model=changeRxns(model,'R04966','NADH[c] + H+[c] + trans-Tetradec-2-enoyl-[acp][c] <=> NAD+[c] + Tetradecanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04966'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9662
+model=changeRxns(model,'R04967','NADPH[c] + H+[c] + trans-Tetradec-2-enoyl-[acp][c] <=> NADP+[c] + Tetradecanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04967'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=ENOYL-ACP-REDUCT-NADPH-RXN
 model=setParam(model,'lb',{'R04968'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.41&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R04969'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.9&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R04970'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.10&quickSearch=Quick+Search
+model=changeRxns(model,'R04969','NADH[c] + H+[c] + trans-Hexadec-2-enoyl-[acp][c] <=> NAD+[c] + Hexadecanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04969'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.9&quickSearch=Quick+Search
+model=changeRxns(model,'R04970','NADPH[c] + H+[c] + trans-Hexadec-2-enoyl-[acp][c] <=> NADP+[c] + Hexadecanoyl-[acp][c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R04970'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.3.1.10&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R04972'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-10642&redirect=T
 model=setParam(model,'lb',{'R04984'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.14.99.60&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R04986'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=3-OCTAPRENYL-4-OHBENZOATE-DECARBOX-RXN&redirect=T
@@ -1582,7 +1772,8 @@ model=setParam(model,'lb',{'R05032'},[-1000]);model=setParam(model,'ub',{'R05032
 model=setParam(model,'lb',{'R05050'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-37&redirect=T
                                     model=setParam(model,'lb',{'R05051'},[-1000]);model=setParam(model,'ub',{'R05051'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R05051'))),:)=[3];  % Reaction directionality unclear!
 model=setParam(model,'lb',{'R05066'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3-HYDROXYISOBUTYRATE-DEHYDROGENASE-RXN
-model=setParam(model,'ub',{'R05068'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.1.1.86&quickSearch=Quick+Search
+model=changeRxns(model,'R05068','NADPH[c] + H+[c] + (R)-3-Hydroxy-3-methyl-2-oxopentanoate[c] <=> NADP+[c] + (R)-2,3-Dihydroxy-3-methylpentanoate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R05068'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.1.1.86&quickSearch=Quick+Search
 %R05069 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14106
 model=setParam(model,'lb',{'R05070'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=DIHYDROXYMETVALDEHYDRAT-RXN&redirect=T
 %R05071 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2-ACETOLACTATE-MUTASE-RXN&redirect=T
@@ -1598,7 +1789,8 @@ model=setParam(model,'lb',{'R05181'},[0]);                                      
 model=setParam(model,'lb',{'R05220'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=R344-RXN&redirect=T
 model=setParam(model,'lb',{'R05221'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=COBINAMIDEKIN-RXN&redirect=T 
 model=setParam(model,'lb',{'R05222'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=COBINPGUANYLYLTRANS-RXN&redirect=T
-model=setParam(model,'ub',{'R05223'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=COBALAMINSYN-RXN&redirect=T
+model=changeRxns(model,'R05223','alpha-Ribazole[c] + Adenosine-GDP-cobinamide[c] <=> GMP[c] + Cobamide coenzyme[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R05223'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=COBALAMINSYN-RXN&redirect=T
 model=setParam(model,'lb',{'R05224'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=R341-RXN&redirect=T
 model=setParam(model,'lb',{'R05225'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=R345-RXN&redirect=T
 %R05233 is reversible                                                                       %https://biocyc.org/META/substring-search?type=NIL&object=1.1.1.1&quickSearch=Quick+Search
@@ -1640,7 +1832,8 @@ model=setParam(model,'lb',{'R05506'},[0]);                                      
 model=setParam(model,'lb',{'R05510'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=3.1.1.45&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R05511'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-9857&redirect=T
 model=setParam(model,'lb',{'R05553'},[0]);model=setParam(model,'ub',{'R05553'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=ADCLY-RXN&redirect=T
-model=setParam(model,'ub',{'R05576'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3-HYDROXYBUTYRYL-COA-DEHYDROGENASE-RXN
+model=changeRxns(model,'R05576','NADPH[c] + H+[c] + Acetoacetyl-CoA[c] <=> NADP+[c] + 3-Hydroxybutanoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R05576'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=3-HYDROXYBUTYRYL-COA-DEHYDROGENASE-RXN
 model=setParam(model,'lb',{'R05577'},[0]);model=setParam(model,'ub',{'R05577'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=ASPARTATE--TRNA-LIGASE-RXN&redirect=T
 model=setParam(model,'lb',{'R05578'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=GLURS-RXN&redirect=T
 model=setParam(model,'lb',{'R05582'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=R267-RXN&redirect=T
@@ -1667,7 +1860,8 @@ model=setParam(model,'lb',{'R05662'},[0]);                                      
 model=setParam(model,'lb',{'R05666'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=TOLUENE-4-MONOOXYGENASE-RXN
                                     model=setParam(model,'lb',{'R05681'},[-1000]);model=setParam(model,'ub',{'R05681'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R05681'))),:)=[3];  % Reaction directionality unclear!
 %R05688 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=DXPREDISOM-RXN&redirect=T
-model=setParam(model,'ub',{'R05706'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=FMNREDUCT-RXN&redirect=T
+model=changeRxns(model,'R05706','NADPH[c] + FMN[c] + H+[c] <=> NADP+[c] + Reduced FMN[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R05706'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=FMNREDUCT-RXN&redirect=T
 model=setParam(model,'lb',{'R05807'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=4.99.1.3-RXN&redirect=T
 model=setParam(model,'lb',{'R05808'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=2.1.1.151-RXN&redirect=T
 model=setParam(model,'lb',{'R05809'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8761&redirect=T 
@@ -1735,7 +1929,8 @@ model=setParam(model,'lb',{'R07100'},[0]);model=setParam(model,'ub',{'R07100'},[
                                     model=setParam(model,'lb',{'R07113'},[-1000]);model=setParam(model,'ub',{'R07113'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R07113'))),:)=[3];  % Reaction directionality unclear!  
                                     model=setParam(model,'lb',{'R07116'},[-1000]);model=setParam(model,'ub',{'R07116'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R07116'))),:)=[3];  % Reaction directionality unclear!                                     
 %R07136 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=R230-RXN&redirect=T
-model=setParam(model,'ub',{'R07168'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.5.1.20-RXN&redirect=T
+model=changeRxns(model,'R07168','NADH[c] + H+[c] + 5,10-Methylenetetrahydrofolate[c] <=> NAD+[c] + 5-Methyltetrahydrofolate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                           
+model=setParam(model,'lb',{'R07168'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=1.5.1.20-RXN&redirect=T
 model=setParam(model,'lb',{'R07210'},[0]);model=setParam(model,'ub',{'R07210'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN0-280&redirect=T
 model=setParam(model,'lb',{'R07211'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN66-569&redirect=T
 model=setParam(model,'lb',{'R07262'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-9311&redirect=T
@@ -1756,7 +1951,8 @@ model=setParam(model,'lb',{'R07415'},[0]);                                      
 model=setParam(model,'lb',{'R07459'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-9789&redirect=T
 model=setParam(model,'lb',{'R07460'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN0-308&redirect=T
                                     model=setParam(model,'lb',{'R07463'},[-1000]);model=setParam(model,'ub',{'R07463'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R07463'))),:)=[3];  % Reaction directionality unclear!
-model=setParam(model,'ub',{'R07605'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN0-4022&redirect=T
+model=changeRxns(model,'R07605','2 NADPH[c] + 2 H+[c] + 7-Cyano-7-carbaguanine[c] <=> 2 NADP+[c] + 7-Aminomethyl-7-carbaguanine[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                               
+model=setParam(model,'lb',{'R07605'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN0-4022&redirect=T
 %R07618 is reversible                                                                       %https://biocyc.org/META/substring-search?type=NIL&object=1.8.1.4&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R07644'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=ENTMULTI-RXN&redirect=T
 model=setParam(model,'lb',{'R07669'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=3.8.1.5&quickSearch=Quick+Search
@@ -1777,9 +1973,12 @@ model=setParam(model,'lb',{'R07769'},[0]);                                      
 model=setParam(model,'lb',{'R07772'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8763&redirect=T
 model=setParam(model,'lb',{'R07773'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8764&redirect=T
 model=setParam(model,'lb',{'R07795'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-13704
-model=setParam(model,'ub',{'R07891'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.16&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R07895'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.16&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R07899'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.16&quickSearch=Quick+Search
+model=changeRxns(model,'R07891','CoA[c] + 3-Oxo-OPC8-CoA[c] <=> Acetyl-CoA[c] + OPC6-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                               
+model=setParam(model,'lb',{'R07891'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.16&quickSearch=Quick+Search
+model=changeRxns(model,'R07895','CoA[c] + 3-Oxo-OPC6-CoA[c] <=> Acetyl-CoA[c] + OPC4-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                               
+model=setParam(model,'lb',{'R07895'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.16&quickSearch=Quick+Search
+model=changeRxns(model,'R07899','CoA[c] + 3-Oxo-OPC4-CoA[c] <=> Acetyl-CoA[c] + (+)-7-Isojasmonic acid CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                               
+model=setParam(model,'lb',{'R07899'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.3.1.16&quickSearch=Quick+Search
                                     model=setParam(model,'lb',{'R08014'},[-1000]);model=setParam(model,'ub',{'R08014'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R08014'))),:)=[3];  % Reaction directionality unclear! 
                                     model=setParam(model,'lb',{'R08017'},[-1000]);model=setParam(model,'ub',{'R08017'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R08017'))),:)=[3];  % Reaction directionality unclear!                                     
                                     model=setParam(model,'lb',{'R08034'},[-1000]);model=setParam(model,'ub',{'R08034'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R08034'))),:)=[3];  % Reaction directionality unclear!                                     
@@ -1799,7 +1998,8 @@ model=setParam(model,'lb',{'R08113'},[0]);                                      
 model=setParam(model,'lb',{'R08120'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=3.1.1.45&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R08121'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=3.1.1.45&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R08146'},[0]);model=setParam(model,'ub',{'R08146'},[1000]);     %https://biocyc.org/META/substring-search?type=NIL&object=1.2.1.3&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R08210'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.17.7.4&quickSearch=Quick+Search
+model=changeRxns(model,'R08210','2 H+[c] + 2 Reduced ferredoxin[c] + 1-Hydroxy-2-methyl-2-butenyl 4-diphosphate[c] <=> H2O[c] + 2 Oxidized ferredoxin[c] + Dimethylallyl diphosphate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                               
+model=setParam(model,'lb',{'R08210'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=1.17.7.4&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R08218'},[0]);model=setParam(model,'ub',{'R08218'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN0-2161&redirect=T
 model=setParam(model,'lb',{'R08222'},[-1000]);model=setParam(model,'ub',{'R08222'},[1000]); %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=THYM-PHOSPH-RXN                                         Irreversible in the original FDR.
 %R08230 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=THYM-PHOSPH-RXN
@@ -1898,7 +2098,8 @@ model=setParam(model,'lb',{'R10124'},[0]);                                      
                                     model=setParam(model,'lb',{'R10126'},[-1000]);model=setParam(model,'ub',{'R10126'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R10126'))),:)=[3];  % Reaction directionality unclear!                                    
 model=setParam(model,'lb',{'R10147'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=DIHYDRODIPICSYN-RXN&redirect=T
                                     model=setParam(model,'lb',{'R10151'},[-1000]);model=setParam(model,'ub',{'R10151'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R10151'))),:)=[3];  % Reaction directionality unclear!
-model=setParam(model,'ub',{'R10159'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-13685&redirect=T
+model=changeRxns(model,'R10159','NADPH[c] + 2 Oxidized adrenal ferredoxin[c] <=> NADP+[c] + H+[c] + 2 Reduced adrenal ferredoxin[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R10159'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-13685&redirect=T
 model=setParam(model,'lb',{'R10170'},[-1000]);model=setParam(model,'ub',{'R10170'},[1000]); %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-13163                                           Irreversible in the original FDR.
 model=setParam(model,'lb',{'R10177'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-13323&redirect=T
 model=setParam(model,'lb',{'R10206'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-18086
@@ -1928,7 +2129,8 @@ model=setParam(model,'lb',{'R10820'},[0]);                                      
 model=setParam(model,'lb',{'R10831'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=3.2.1.52&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R10841'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=URONATE-DEHYDROGENASE-RXN
 %R10845 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-14469
-model=setParam(model,'ub',{'R10859'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15878
+model=changeRxns(model,'R10859','Reduced flavodoxin[c] + 2-C-Methyl-D-erythritol 2,4-cyclodiphosphate[c] <=> H2O[c] + Oxidized flavodoxin[c] + 1-Hydroxy-2-methyl-2-butenyl 4-diphosphate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R10859'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15878
 model=setParam(model,'lb',{'R10907'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-16652
 model=setParam(model,'lb',{'R10936'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-12573
                                     model=setParam(model,'lb',{'R10948'},[-1000]);model=setParam(model,'ub',{'R10948'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R10948'))),:)=[3];  % Reaction directionality unclear!
@@ -1949,7 +2151,8 @@ model=setParam(model,'lb',{'R11174'},[0]);                                      
 model=setParam(model,'lb',{'R11188'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-16009
 model=setParam(model,'lb',{'R11225'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-16937
 %R11319 is reversible                                                                       %https://biocyc.org/META/substring-search?type=NIL&object=2.7.4.3&quickSearch=Quick+Search
-model=setParam(model,'ub',{'R11329'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-17518
+model=changeRxns(model,'R11329','Coproporphyrin III[c] + Fe2+[c] <=> 2 H+[c] + Fe-coproporphyrin III[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R11329'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-17518
 model=setParam(model,'lb',{'R11372'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-17809
 model=setParam(model,'lb',{'R11396'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-16748
 model=setParam(model,'lb',{'R11443'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=LEUCYLTRANSFERASE-RXN
@@ -1969,7 +2172,8 @@ model=setParam(model,'lb',{'R11634'},[0]);                                      
 model=setParam(model,'lb',{'R11635'},[0]);model=setParam(model,'ub',{'R11635'},[1000]);     %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN0-724
 model=setParam(model,'lb',{'R11636'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN0-723
                                     model=setParam(model,'lb',{'R11671'},[-1000]);model=setParam(model,'ub',{'R11671'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R11671'))),:)=[3];  % Reaction directionality unclear!
-model=setParam(model,'ub',{'R11765'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-19329
+model=changeRxns(model,'R11765','NADPH[c] + H+[c] + 7,8-Dihydrobiopterin[c] <=> NADP+[c] + Tetrahydrobiopterin[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R11765'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-19329
 model=setParam(model,'lb',{'R11768'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-8775
 model=setParam(model,'lb',{'R11785'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-18659
 model=setParam(model,'lb',{'R11786'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15952
@@ -1992,15 +2196,19 @@ model=setParam(model,'lb',{'R12423'},[0]);                                      
 model=setParam(model,'lb',{'R12424'},[0]);                                                  %https://biocyc.org/META/substring-search?type=NIL&object=2.8.1.8&quickSearch=Quick+Search
 model=setParam(model,'lb',{'R12427'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN0-947
 model=setParam(model,'lb',{'R12428'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-13037
-model=setParam(model,'ub',{'R00647'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8784&redirect=T
-model=setParam(model,'ub',{'R01652'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-7800&redirect=T
+model=changeRxns(model,'R00647','L-xylo-Hexulonolactone[c] <=> Ascorbate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R00647'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8784&redirect=T
+model=changeRxns(model,'R01652','(2S)-2-Isopropyl-3-oxosuccinate[c] <=> CO2[c] + 4-Methyl-2-oxopentanoate[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R01652'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-7800&redirect=T
 %R02317 is reversible                                                                       %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8173&redirect=T
 model=setParam(model,'lb',{'R02962'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8483&redirect=T
                                     model=setParam(model,'lb',{'R03166'},[-1000]);model=setParam(model,'ub',{'R03166'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R03166'))),:)=[3];  % Reaction directionality unclear!
 model=setParam(model,'lb',{'R03186'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-3523&redirect=T
-model=setParam(model,'ub',{'R03672'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-11369&redirect=T
+model=changeRxns(model,'R03672','Dopaquinone[c] + 2-Carboxy-2,3-dihydro-5,6-dihydroxyindole[c] <=> 3,4-Dihydroxy-L-phenylalanine[c] + L-Dopachrome[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R03672'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-11369&redirect=T
 model=setParam(model,'lb',{'R03674'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-11403&redirect=T
-model=setParam(model,'ub',{'R03758'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=THREOSPON-RXN&redirect=T
+model=changeRxns(model,'R03758','L-2-Amino-3-oxobutanoic acid[c] <=> CO2[c] + Aminoacetone[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R03758'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=THREOSPON-RXN&redirect=T
                                     model=setParam(model,'lb',{'R04500'},[-1000]);model=setParam(model,'ub',{'R04500'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04500'))),:)=[3];  % Reaction directionality unclear!
 model=setParam(model,'lb',{'R04578'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=C04718-C060066-AUTOTRANSFORMATION-RXN&redirect=T
                                     model=setParam(model,'lb',{'R04639'},[-1000]);model=setParam(model,'ub',{'R04639'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04639'))),:)=[3];  % Reaction directionality unclear!
@@ -2010,7 +2218,8 @@ model=setParam(model,'lb',{'R04769'},[0]);                                      
                                     model=setParam(model,'lb',{'R05048'},[-1000]);model=setParam(model,'ub',{'R05048'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R05048'))),:)=[3];  % Reaction directionality unclear! 
                                     model=setParam(model,'lb',{'R05098'},[-1000]);model=setParam(model,'ub',{'R05098'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R05098'))),:)=[3];  % Reaction directionality unclear!  
                                     model=setParam(model,'lb',{'R05455'},[-1000]);model=setParam(model,'ub',{'R05455'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R05455'))),:)=[3];  % Reaction directionality unclear!                                    
-model=setParam(model,'ub',{'R05483'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=LINABSPON-RXN&redirect=T
+model=changeRxns(model,'R05483','1,3,4,6-Tetrachloro-1,4-cyclohexadiene[c] <=> Hydrochloric acid[c] + 1,2,4-Trichlorobenzene[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R05483'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=LINABSPON-RXN&redirect=T
 model=setParam(model,'lb',{'R05484'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=LINBBSPON-RXN&redirect=T
                                     model=setParam(model,'lb',{'R05824'},[-1000]);model=setParam(model,'ub',{'R05824'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R05824'))),:)=[3];  % Reaction directionality unclear! 
 model=setParam(model,'lb',{'R05826'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=RXN-8225&redirect=T
@@ -2094,7 +2303,8 @@ model=setParam(model,'lb',{'R11098'},[0]);                                      
 model=setParam(model,'lb',{'R11099'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15127
 model=setParam(model,'lb',{'R11100'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15124
 model=setParam(model,'lb',{'R11101'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15121
-model=setParam(model,'ub',{'R11148'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-17336
+model=changeRxns(model,'R11148','3,4-Dihydroxy-2-methy-4-[(2E,6E)-farnesyl]-3,4-dihydroquinoline 1-oxide[c] <=> H2O[c] + Aurachin B[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+model=setParam(model,'lb',{'R11148'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-17336
 model=setParam(model,'lb',{'R11176'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-16527
 model=setParam(model,'lb',{'R11228'},[0]);                                                  %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-17253
                                     model=setParam(model,'lb',{'R11523'},[-1000]);model=setParam(model,'ub',{'R11523'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R11523'))),:)=[3];  % Reaction directionality unclear! 
@@ -2147,9 +2357,8 @@ model=setParam(model,'lb',{'R00010'},[0]);model=setParam(model,'ub',{'R00010'},[
 
                                                                             % NB! The following reactions appears in the FDR upon generating a model with the command
                                                                             % "model=getKEGGModelForOrganism('hpse');" which includes reactions with undefined stoichiometries 
-                                                                            % as well as reactions labelled as incomplete or general. As such, they are kept here in case users
-                                                                            % prefer generating an FDR using these settings. If this is not the case, the following constraints 
-                                                                            % are to be kept silenced.
+                                                                            % etc. As such, they are kept here in case users prefer generating an FDR using these settings. 
+                                                                            % If this is not the case, the following constraints are to be kept silenced.
 
                                     %model=setParam(model,'lb',{'R08763'},[-1000]);model=setParam(model,'ub',{'R08763'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R08763'))),:)=[3];  % Reaction directionality unclear!
 %model=setParam(model,'lb',{'R00381'},[0]);model=setParam(model,'ub',{'R00381'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R00381'))),:)=[4];    %https://biocyc.org/META/NEW-IMAGE?type=NIL&object=DNA-LIGASE-ATP-RXN&redirect=T
@@ -2163,7 +2372,8 @@ model=setParam(model,'lb',{'R00010'},[0]);model=setParam(model,'ub',{'R00010'},[
 %model=setParam(model,'lb',{'R10823'},[0]);model=setParam(model,'ub',{'R10823'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R10823'))),:)=[4];    %https://biocyc.org/META/substring-search?type=NIL&object=6.5.1.7&quickSearch=Quick+Search
 %model=setParam(model,'lb',{'R00590'},[0]);model=setParam(model,'ub',{'R00590'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R00590'))),:)=[4];    %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-15125
 %model=setParam(model,'lb',{'R00698'},[0]);model=setParam(model,'ub',{'R00698'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R00698'))),:)=[4];    %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=PHENYLALANINE-2-MONOOXYGENASE-RXN
-%model=setParam(model,'ub',{'R04546'},[0]);model=setParam(model,'lb',{'R04546'},[-1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04546'))),:)=[4];   %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9850
+%model=changeRxns(model,'R04546','CoA[c] + 3alpha,7alpha-Dihydroxy-5beta-cholestanoyl-CoA[c] <=> Propanoyl-CoA[c] + Chenodeoxycholoyl-CoA[c]',3);  % Reverses the order in which reactants and products appear in the reaction equation.                                                                                                                                                                                                                   
+%model=setParam(model,'lb',{'R04546'},[0]);model=setParam(model,'lb',{'R04546'},[-1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R04546'))),:)=[4];   %https://biocyc.org/META/NEW-IMAGE?type=REACTION&object=RXN-9850
 %model=setParam(model,'lb',{'R06411'},[0]);model=setParam(model,'ub',{'R06411'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R06411'))),:)=[4];    %https://biocyc.org/META/substring-search?type=NIL&object=4.2.1.17&quickSearch=Quick+Search
 %model=setParam(model,'lb',{'R06412'},[0]);model=setParam(model,'ub',{'R06412'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R06412'))),:)=[4];    %https://biocyc.org/META/substring-search?type=NIL&object=4.2.1.17&quickSearch=Quick+Search
 %model=setParam(model,'lb',{'R08700'},[0]);model=setParam(model,'ub',{'R08700'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R08700'))),:)=[4];    %https://biocyc.org/META/substring-search?type=NIL&object=2.8.1.13&quickSearch=Quick+Search
@@ -2213,7 +2423,7 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_OUT_Ortophosphate'))),:
 
 
 
-%exportToExcelFormat(model,'det.xlsx')                                                    
+%exportToExcelFormat(model,'HPseGEM.xlsx')                                  % Saves the resulting GEM as an Excel-file (.xlsx-format) called HPseGEM.
                                                     
 
 
