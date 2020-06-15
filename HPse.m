@@ -13,10 +13,7 @@
 %%  Recommended software
 
 %   Microsoft Windows 10 (64-bit)
-%   MATLAB (v R2017b)
-                                                    
-                                                        %   The MATLAB toolbox COBRA (v 3.0) (Heirendt et al., 2019)
-   
+%   MATLAB (v R2017b)                                                       
 %   The MATLAB toolbox RAVEN (v 2.3.0) (Wang et al., 2018) 
 %   The Gurobi Optimizer (v 8.0.1) solver. 
 %   The libSBML MATLAB API (v 5.17.0) (Hucka et al., 2003)
@@ -63,7 +60,7 @@ model.compNames=[{'Cytosol'};{'Extracellular'}];
                                                                             % been curated manually by trained scientists (see below).
 
 model.rev(:,1)=[1];                                                         % All reactions in the FDR are to be interpreted as reversible for now. This is done to harmonize
-                                                                            % the system prior to the introduciton of constraints pertaining to reaction directionalities 
+                                                                            % the system prior to the introduction of constraints pertaining to reaction directionalities 
                                                                             % which is done later.
                                                                             
 model=setParam(model,'lb',model.rxns,[-1000]);                              % Sets the lower bound of all reactions in the FDR to -1000 mmol gCDW^-1 h^-1.
@@ -112,10 +109,10 @@ FDRrcns=numel(model.rxns);                                                  % Th
 
 [reducedModel, deletedReactions, deletedMetabolites]=simplifyModel(model,false,false,false,true);
 
-size(deletedMetabolites)                                                    % 1149 out of 1583 metabolites are 'orphan metabolites' - i.e., metabolites that can either 
+size(deletedMetabolites);                                                   % 1149 out of 1583 metabolites are 'orphan metabolites' - i.e., metabolites that can either 
                                                                             % only be produced or only consumed, but not both. In other words, dead-end metabolites.
                                                                             
-size(deletedReactions)                                                      % 799 out of 1367 reactions are dead-end reactions.                                                                         
+size(deletedReactions);                                                     % 799 out of 1367 reactions are dead-end reactions.                                                                         
                                                                             
 
                                                                             % An extensive literature search was carried out with the objective to identify experimentally
@@ -760,6 +757,18 @@ model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_H2O'))),:)=[5];     
 [model, addedRxns]=addExchangeRxns(model,'out',lastMet);                                    % Adds a producing exchange reaction for H2O.      
 model.rxns(end,1)={'EXC_OUT_H2O'};                                                          % Assigns an appropriate reaction ID to the exchange reaction.
 model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_OUT_H2O'))),:)=[5];                % Assigns a confidence score of 5.
+
+                                                                            % Similarly, a nitrogen source in the form of Ammonia is incorporated into the GEM
+                                                                            % through addition of a transport reaction along with a consuming exchange reaction:
+                                                                            
+[model, addedRxns]=addTransport(model,{'c'},{'e'},{'Ammonia'},true,false);                  % Adds a reversible transport reaction for Ammonia.
+model.rxns(end,1)={'TRP_c->e_Ammonia'};                                                     % Assigns an appropriate reaction ID to the transport reaction.
+model.rxnConfidenceScores((find(ismember(model.rxns,'TRP_c->e_Ammonia'))),:)=[5];           % Assigns a confidence score of 5.
+model=changeGeneAssoc(model,'TRP_c->e_Ammonia','HPF_19190');  
+lastMet=model.mets(end);                                                    
+[model, addedRxns]=addExchangeRxns(model,'in',lastMet);                                     % Adds a consuming exchange reaction for Ammonia.
+model.rxns(end,1)={'EXC_IN_Ammonia'};                                                       % Assigns an appropriate reaction ID to the exchange reaction.
+model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_IN_Ammonia'))),:)=[5];             % Assigns a confidence score of 5.                                                                                                                                                   
 
                                                                             % Furthermore, producing exchange reactions are added for CO and CO2:
 
@@ -2381,81 +2390,133 @@ model=setParam(model,'lb',{'R00010'},[0]);model=setParam(model,'ub',{'R00010'},[
                                     %model=setParam(model,'lb',{'R11905'},[-1000]);model=setParam(model,'ub',{'R11905'},[1000]);model.rxnConfidenceScores((find(ismember(model.rxns,'R11905'))),:)=[3];  % Reaction directionality unclear!                                     
 
                                                                             %% Artificial biomass reaction
-                                    
-%model.rxns(end,1)={'TRP_c->e_Biomass'};                                                     % Assigns an appropriate reaction ID to the transport reaction.
-%model.rxns(end,1)={'EXC_OUT_Biomass'};                                                      % Assigns an appropriate reaction ID to the exchange reaction.
+                                   
+                                                                            % The artificial biomass reaction adapted for the purpose of simulating production of 
+                                                                            % biomass – i.e., growth – was adapted from the GEM RehMBEL1391_sbml_L3V1 on Cupriavidus 
+                                                                            % necator H16 (formerly Ralstonia eutropha H16) originally reported by Park et al. (2011) 
+                                                                            % and available in an updated version from the GitHub-repository of GitHub-user m-jahn 
+                                                                            % (https://github.com/m-jahn/genome-scale-models). The adapted biomass reaction was designed 
+                                                                            % as a lumping together of the following biomolecular pools: lipopolisaccharide, RNA, 
+                                                                            % carbohydrate, phospholipid, peptidoglycan, protein, cofactors and vitamines and DNA. 
+                                                                            % Accordingly, artificial biosynthesis reactions for each of these pools had to be adapted 
+                                                                            % as well. All of these artificial reactions were assigned confidence score of 0 to reflect 
+                                                                            % the fact that no computational or experimental efforts were done to check their eligibility 
+                                                                            % in the specific case of H. pseudoflava. Metabolite IDs pertaining to biomass precursors 
+                                                                            % were manually harmonized with KEGG-based terminology.
+                                                                            
+
+rxns.rxns={'lipopolisaccharide'};                                                       % Creates this new reaction ID.
+rxns.equations={'0.28 CDP-ethanolamine + 0.14 Di[3-deoxy-D-manno-octulosonyl]-lipid IV(A) + 0.42 CMP-3-deoxy-D-manno-octulosonate + 0.42 ADP-L-glycero-D-manno-heptose + 0.28 UDP-glucose => lipopolisaccharide + 0.28 UDP + 0.42 CMP + 0.28 CDP + 0.42 ADP'};
+model=addRxns(model,rxns,2,'c',true);                                                   % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'lipopolisaccharide'))),:)=[0];     % Assigns a confidence score of 0 as the reaction is artificial.
+
+
+rxns.rxns={'RNA'};                                                                      % Creates this new reaction ID.
+rxns.equations={'0.75 GTP + 0.747 UTP + 0.998 CTP + 0.631 ATP => RNA + 1.25 Orthophosphate + 1.25 ADP'};
+model=addRxns(model,rxns,2,'c',true);                                                   % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'RNA'))),:)=[0];                    % Assigns a confidence score of 0 as the reaction is artificial.
+
+
+rxns.rxns={'carbohydrate'};                                                             % Creates this new reaction ID.
+rxns.equations={'0.984 UDP-N-acetyl-D-galactosamine + 3.937 UDP-N-acetyl-D-glucosamine => carbohydrate + 4.921 UDP'};
+model=addRxns(model,rxns,2,'c',true);                                                   % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'carbohydrate'))),:)=[0];           % Assigns a confidence score of 0 as the reaction is artificial.
+
+
+rxns.rxns={'phospholipid'};                                                             % Creates this new reaction ID.
+rxns.equations={'0.927 Phosphatidylethanolamine + 0.283 Phosphatidylglycerol + 0.093 Cardiolipin => phospholipid'};
+model=addRxns(model,rxns,2,'c',true);                                                   % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'phospholipid'))),:)=[0];           % Assigns a confidence score of 0 as the reaction is artificial.
+
+
+rxns.rxns={'peptidoglycan'};                                                           % Creates this new reaction ID.
+rxns.equations={'D-Alanine[c] + peptidoglycan precursor[c] => D-Alanine[e] + peptidoglycan[c]'};
+model=addRxns(model,rxns,3,'',true);                                                   % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'peptidoglycan'))),:)=[0];         % Assigns a confidence score of 0 as the reaction is artificial.
+
+
+rxns.rxns={'peptidoglycan precursor biosynthesis'};                                                           % Creates this new reaction ID.
+rxns.equations={'Undecaprenyl-diphospho-N-acetylmuramoyl-(N-acetylglucosamine)-L-alanyl-D-glutamyl-meso-2,6-diaminopimeloyl-D-alanyl-D-alanine => di-trans,poly-cis-Undecaprenyl diphosphate + peptidoglycan precursor'};   
+% NB! It is unclear whether the metabolite with the long name in the reaction above is the correct compound!
+model=addRxns(model,rxns,2,'c',true);                                                                         % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'peptidoglycan precursor biosynthesis'))),:)=[0];         % Assigns a confidence score of 0 as the reaction is artificial.
+
+
+rxns.rxns={'protein'};                                                                  % Creates this new reaction ID.
+rxns.equations={'0.512 L-Glutamine + 0.43 L-Phenylalanine + 0.687 L-Valine + 1.211 L-Alanine + 0.512 L-Glutamate + 1.135 Glycine + 0.115 L-Cysteine + 0.369 L-Aspartate + 0.159 L-Methionine + 0.369 L-Asparagine + 0.223 L-Histidine + 0.306 L-Isoleucine + 0.456 L-Arginine + 0.764 L-Threonine + 0.997 L-Proline + 0.189 L-Lysine + 40 ATP + 0.522 L-Leucine + 0.008 L-Tryptophan + 0.421 L-Serine + 0.222 L-Tyrosine => protein + 40 ADP'};
+model=addRxns(model,rxns,2,'c',true);                                                   % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'protein'))),:)=[0];                % Assigns a confidence score of 0 as the reaction is artificial.
+
+
+rxns.rxns={'cofactors_and_vitamines'};                                                  % Creates this new reaction ID.
+rxns.equations={'0.167 NAD+ + 0.418 Thiamine + 0.14 Ubiquinone-8 + 0.141 FAD + 0.0074 Heme A + 0.249 Tetrahydrofolate + 0.243 FMN + 0.149 NADP+ + 0.145 CoA + 0.449 Pyridoxal phosphate => cofactors and vitamines'};
+model=addRxns(model,rxns,2,'c',true);                                                   % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'cofactors_and_vitamines'))),:)=[0];% Assigns a confidence score of 0 as the reaction is artificial.
+
+
+rxns.rxns={'DNA'};                                                                      % Creates this new reaction ID.
+rxns.equations={'1.054 dCTP + 0.564 dTTP + 1.054 dGTP + 0.564 dATP + 4.4 ATP => 4.4 Orthophosphate + DNA + 4.4 ADP'};
+model=addRxns(model,rxns,2,'c',true);                                                   % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'DNA'))),:)=[0];                    % Assigns a confidence score of 0 as the reaction is artificial.
+
+
+rxns.rxns={'Biomass'};                                                                  % Creates this new reaction ID.
+rxns.equations={'0.034 lipopolisaccharide + 0.06 RNA + 0.055 carbohydrate + 0.0495 phospholipid + 0.06 peptidoglycan + 0.68 protein + 0.03 cofactors and vitamines + 0.031 DNA + 15.3 ATP => Biomass + 15.3 Orthophosphate + 15.3 ADP'};
+model=addRxns(model,rxns,2,'c',true);                                                   % Adds the new reaction to the model.    
+model.rxnConfidenceScores((find(ismember(model.rxns,'Biomass'))),:)=[0];                % Assigns a confidence score of 0 as the reaction is artificial.
+
+
+                                                                            % A transport and a producing exchange reaction is added for Biomass:
+
+[model, addedRxns]=addTransport(model,{'c'},{'e'},{'Biomass'},true,false);              % Adds a reversible transport reaction for Biomass.
+model.rxns(end,1)={'TRP_c->e_Biomass'};                                                 % Assigns an appropriate reaction ID to the transport reaction.
+model.rxnConfidenceScores((find(ismember(model.rxns,'TRP_c->e_Biomass'))),:)=[0];       % Assigns a confidence score of 0.
+lastMet=model.mets(end);                                                    
+[model, addedRxns]=addExchangeRxns(model,'out',lastMet);                                % Adds a producing exchange reaction for Biomass.
+model.rxns(end,1)={'EXC_OUT_Biomass'};                                                  % Assigns an appropriate reaction ID to the exchange reaction.
+model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_OUT_Biomass'))),:)=[0];        % Assigns a confidence score of 0.
+
+
                                                                             %% Validation/testing
 
+model=setParam(model, 'obj', {'Biomass'},[1]);                              % The objective is set to maximize production of biomass.                                                                            
+                                                                            
                                                                             % For the sake of error checking, constraints relating to energy and redox balance are
                                                                             % temporarily relaxed by the introduction of these fake reactions:
                                                                             
-rxns.rxns={'FAKE_FREE_ATP';'FAKE_FREE_NADH';'FAKE_FREE_NADPH'};             % Creates these new reaction IDs.
-rxns.equations={'ATP <=> ADP';'NAD+ <=> NADH';'NADP+ <=> NADPH'};           % Creates the new reaction equations.
-model=addRxns(model,rxns,2,'c');                                            % Adds the new reactions to the model.    
-model.rxnConfidenceScores((find(ismember(model.rxns,'FAKE_FREE_ATP'))),:)=[0];          % Assigns a confidence score of 0
-model.rxnConfidenceScores((find(ismember(model.rxns,'FAKE_FREE_NADH'))),:)=[0];         % Assigns a confidence score of 0
-model.rxnConfidenceScores((find(ismember(model.rxns,'FAKE_FREE_NADPH'))),:)=[0];        % Assigns a confidence score of 0
+%rxns.rxns={'FAKE_FREE_ATP';'FAKE_FREE_NADH';'FAKE_FREE_NADPH'};             % Creates these new reaction IDs.
+%rxns.equations={'ATP <=> ADP';'NAD+ <=> NADH';'NADP+ <=> NADPH'};           % Creates the new reaction equations.
+%model=addRxns(model,rxns,2,'c');                                            % Adds the new reactions to the model.    
+%model.rxnConfidenceScores((find(ismember(model.rxns,'FAKE_FREE_ATP'))),:)=[0];          % Assigns a confidence score of 0
+%model.rxnConfidenceScores((find(ismember(model.rxns,'FAKE_FREE_NADH'))),:)=[0];         % Assigns a confidence score of 0
+%model.rxnConfidenceScores((find(ismember(model.rxns,'FAKE_FREE_NADPH'))),:)=[0];        % Assigns a confidence score of 0
                                                     
                                                                             % In an additional preparation for error checking, fake transport and exchange reactions 
                                                                             % are temporarily added for H+ and Orthophosphate:
+                                                                           
+                                                                                                                                                        
+%[model, addedRxns]=addTransport(model,{'c'},{'e'},{'H+'},true,false);                   % Adds a reversible transport reaction for H+.
+%model.rxns(end,1)={'TRP_c->e_H+'};                                                      % Assigns an appropriate reaction ID to the transport reaction.
+%model.rxnConfidenceScores((find(ismember(model.rxns,'TRP_c->e_H+'))),:)=[0];            % Assigns a confidence score of 0.
+%lastMet=model.mets(end);                                                    
+%[model, addedRxns]=addExchangeRxns(model,'both',lastMet);                               % Adds a reversible exchange reaction for H+.
+%model.rxns(end,1)={'EXC_OUT_H+'};                                                       % Assigns an appropriate reaction ID to the exchange reaction.
+%model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_OUT_H+'))),:)=[0];             % Assigns a confidence score of 0.
                                                                             
-                                            %LÄMPLIG CONF SCORE FÖR H+ RESP
-                                            %ORTOPHOSPHATE NEDAN??
-                                                                            
-                                                                            
-[model, addedRxns]=addTransport(model,{'c'},{'e'},{'H+'},true,false);                   % Adds a reversible transport reaction for H+.
-model.rxns(end,1)={'TRP_c->e_H+'};                                                      % Assigns an appropriate reaction ID to the transport reaction.
-model.rxnConfidenceScores((find(ismember(model.rxns,'TRP_c->e_H+'))),:)=[0];            % Assigns a confidence score of 0.
-lastMet=model.mets(end);                                                    
-[model, addedRxns]=addExchangeRxns(model,'both',lastMet);                               % Adds a reversible exchange reaction for H+.
-model.rxns(end,1)={'EXC_OUT_H+'};                                                       % Assigns an appropriate reaction ID to the exchange reaction.
-model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_OUT_H+'))),:)=[0];             % Assigns a confidence score of 0.
-                                                                            
-[model, addedRxns]=addTransport(model,{'c'},{'e'},{'Orthophosphate'},true,false);       % Adds a reversible transport reaction for Orthophosphate.
-model.rxns(end,1)={'TRP_c->e_Ortophosphate'};                                           % Assigns an appropriate reaction ID to the transport reaction.
-model.rxnConfidenceScores((find(ismember(model.rxns,'TRP_c->e_Ortophosphate'))),:)=[0]; % Assigns a confidence score of 0.
-lastMet=model.mets(end);                                                    
-[model, addedRxns]=addExchangeRxns(model,'both',lastMet);                               % Adds a reversible exchange reaction for Ortophosphate.
-model.rxns(end,1)={'EXC_OUT_Ortophosphate'};                                            % Assigns an appropriate reaction ID to the exchange reaction.
-model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_OUT_Ortophosphate'))),:)=[0];  % Assigns a confidence score of 0.
+%[model, addedRxns]=addTransport(model,{'c'},{'e'},{'Orthophosphate'},true,false);       % Adds a reversible transport reaction for Orthophosphate.
+%model.rxns(end,1)={'TRP_c->e_Orthophosphate'};                                          % Assigns an appropriate reaction ID to the transport reaction.
+%model.rxnConfidenceScores((find(ismember(model.rxns,'TRP_c->e_Orthophosphate'))),:)=[0];% Assigns a confidence score of 0.
+%lastMet=model.mets(end);                                                    
+%[model, addedRxns]=addExchangeRxns(model,'both',lastMet);                               % Adds a reversible exchange reaction for Orthophosphate.
+%model.rxns(end,1)={'EXC_OUT_Orthophosphate'};                                           % Assigns an appropriate reaction ID to the exchange reaction.
+%model.rxnConfidenceScores((find(ismember(model.rxns,'EXC_OUT_Orthophosphate'))),:)=[0]; % Assigns a confidence score of 0.
 
 
 
-
-
-%exportToExcelFormat(model,'HPseGEM.xlsx')                                  % Saves the resulting GEM as an Excel-file (.xlsx-format) called HPseGEM.
-                                                    
-
-
-
-
-
-
-
-
-
-                                                    
-%[reducedModel, deletedReactions, deletedMetabolites]=simplifyModel(model,false,false,false,true);
-%disp(deletedMetabolites);                                                   % 
-%disp(deletedReactions);                                                     %                                                                                         
-                                                                                        
-                                                                                        
-                                                                                        
-                                                                                      
                                                                             % The fake reations for ATP, NADH and NADPH introduced earlier can now be removed:            
-%model=removeReactions(model,{'FAKE_FREE_ATP';'FAKE_FREE_NADH';'FAKE_FREE_NADPH'});     % Removes the fake reactions introduced earlier.                                                                                 
+%model=removeReactions(model,{'FAKE_FREE_ATP';'FAKE_FREE_NADH';'FAKE_FREE_NADPH'});     % Removes the fake reactions introduced earlier.  
 
-
-
-
-
-
-
-%[noFluxRxns, noFluxRxnsRelaxed, subGraphs, notProducedMets, minToConnect,...
-%    neededForProductionMat]=gapReport(model)                               % Insane run-time..
-
-
-
-
-
-
+                                                                            %% Saving the GEM
+    
+exportToExcelFormat(model,'HPseGEM.xlsx')                                   % Saves the resulting GEM as an Excel-file (.xlsx-format) called HPseGEM.
+exportModel(model,'HPseGEM.xml');                                           % Saves the resulting GEM as an SBML-file (.xml-format) called HPseGEM.
