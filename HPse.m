@@ -2,10 +2,10 @@
 
 %   The work herein presented was conducted in the systems biology group of the Department of Protein Science at the School of Engineering Sciences in Chemistry, Biotechnology,
 %   and Health (CBH) KTH located at Science for Life Laboratory (SciLifeLab) in Solna, Stockholm (Sweden). It was the primary undertaking of a thesis project subsequently 
-%   submitted for the degree of Master of Science in Engineering, Biotechnology at the Faculty of Engineering (LTH), Lund university in 2020. 
+%   submitted for the degree of Master of Science in Engineering, Biotechnology at the Faculty of Engineering (LTH), Lund university in June 2020. 
 
 %   This thesis was titled "Reconstruction of Genome-Scale Metabolic Models with Concomitant Constraint-Based Modelling for Flux Prediction – a Case Study of Syngas Consuming 
-%   Hydrogenophaga pseudoflava" and is available from Lund University Papers (LUP).
+%   Hydrogenophaga pseudoflava" and is available from Lund University Papers (LUP): http://lup.lub.lu.se/student-papers/record/9018713
 
 %   Author: Cristopher Ollagnier Widén
 %   Supervisors: Paul Hudson (KTH), Ed van Niel (LTH), Kiyan Shabestary (KTH)
